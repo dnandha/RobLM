@@ -15,6 +15,7 @@ pattern = r"[^A-z]*([0-9])\.([A-z]+)\((.*)\)"
 
 successes = {}
 failures = {}
+accuracies = {}
 
 
 def proc_instructions(instructions):
@@ -56,9 +57,9 @@ def proc_eval(labels, preds):
             failed_args += 1
             failures.update(args_entry)
 
-    plan_entry = {'plan': successes.get('plan', 0) + 1}
-    args_entry = {'args': successes.get('args', 0) + 1}
-    full_entry = {'full': successes.get('full', 0) + 1}
+    plan_entry = {'PLAN': successes.get('PLAN', 0) + 1}
+    args_entry = {'ARGS': successes.get('ARGS', 0) + 1}
+    full_entry = {'FULL': successes.get('FULL', 0) + 1}
 
     if not failed_acts:
         successes.update(plan_entry)
@@ -74,6 +75,24 @@ def proc_eval(labels, preds):
         successes.update(full_entry)
     else:
         failures.update(full_entry)
+
+    for k in failures:
+        if k not in successes:
+            continue
+        accuracies[k] = successes[k] / (successes[k] + failures[k])
+
+
+def print_stats(savefile=None):
+    header = "KEY ACCURACY SUCCESSES FAILURES"
+    if savefile is None:
+        print(header)
+        for k in sorted(accuracies):
+            print(k, accuracies[k], successes[k], failures[k])
+    else:
+        with open(savefile, 'w') as f:
+            f.write(header)
+            for k in sorted(accuracies):
+                f.write(f"{k} {accuracies[k]} {successes[k]} {failures[k]}\n")
 
 
 if __name__ == "__main__":
@@ -187,12 +206,9 @@ if __name__ == "__main__":
             #    metric.add_batch(predictions=p, references=l)
             progress.update(1)
 
-            if progress.n % 100 == 0:
-                print("SUCC:", successes)
-                print("FAIL:", failures)
-
-        print("SUCC:", successes)
-        print("FAIL:", failures)
+            if progress.n % 20 == 0:
+                print_stats()
+        print_stats(savefile=args.eval+".results.txt")
 
         score = metric.compute()
         print(score)
