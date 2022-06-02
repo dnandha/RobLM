@@ -42,38 +42,41 @@ def proc_eval(labels, preds):
         expert_act = label['action']
         expert_args = label['args']
 
-        act_entry = {expert_act: successes.get(expert_act, 0) + 1}
-        args_entry = {expert_act+"_args": successes.get(expert_act+"_args", 0) + 1}
-
         if act_ == expert_act:
+            act_entry = {expert_act: successes.get(expert_act, 0) + 1}
             successes.update(act_entry)
         else:
             failed_acts += 1
+            act_entry = {expert_act: failures.get(expert_act, 0) + 1}
             failures.update(act_entry)
 
         if args_ == expert_args:
+            args_entry = {expert_act+"_args": successes.get(expert_act+"_args", 0) + 1}
             successes.update(args_entry)
         else:
             failed_args += 1
+            args_entry = {expert_act+"_args": failures.get(expert_act+"_args", 0) + 1}
             failures.update(args_entry)
 
-    plan_entry = {'PLAN': successes.get('PLAN', 0) + 1}
-    args_entry = {'ARGS': successes.get('ARGS', 0) + 1}
-    full_entry = {'FULL': successes.get('FULL', 0) + 1}
-
     if not failed_acts:
+        plan_entry = {'0STEPS': successes.get('0STEPS', 0) + 1}
         successes.update(plan_entry)
     else:
+        plan_entry = {'0STEPS': failures.get('0STEPS', 0) + 1}
         failures.update(plan_entry)
 
     if not failed_args:
+        args_entry = {'1ARGS': successes.get('1ARGS', 0) + 1}
         successes.update(args_entry)
     else:
+        args_entry = {'1ARGS': failures.get('1ARGS', 0) + 1}
         failures.update(args_entry)
 
     if not failed_acts and not failed_args:
+        full_entry = {'2PLAN': successes.get('2PLAN', 0) + 1}
         successes.update(full_entry)
     else:
+        full_entry = {'2PLAN': failures.get('2PLAN', 0) + 1}
         failures.update(full_entry)
 
     for k in failures:
@@ -83,7 +86,7 @@ def proc_eval(labels, preds):
 
 
 def print_stats(savefile=None):
-    header = "KEY ACCURACY SUCCESSES FAILURES"
+    header = "KEY ACCURACY SUCCESSES FAILURES\n"
     if savefile is None:
         print(header)
         for k in sorted(accuracies):
