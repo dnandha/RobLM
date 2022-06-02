@@ -1,0 +1,218 @@
+ObjectType,Scenes,Actionable Properties,Material Properties,Default Compatible Receptacles,Contextual Interactions
+AlarmClock,Bedrooms (All),Pickupable,"Temperature, Mass, SalientMaterials","Box, Dresser, Desk, SideTable, DiningTable, TVStand, CoffeeTable, CounterTop, Shelf",
+AluminumFoil,Kitchens (1/30),Pickupable,"Temperature, Mass, SalientMaterials",,
+Apple,Kitchens (All),"Pickupable, Sliceable","Temperature, Mass, SalientMaterials","Pot, Pan, Bowl, Microwave, Fridge, Plate, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, Desk, CounterTop, GarbageCan, Dresser",
+AppleSliced*,Kitchens (All),Pickupable,"Temperature, Mass, SalientMaterials, Inherited: Slice (Apple)","Pot, Pan, Bowl, Microwave, Fridge, Plate, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, Desk, CounterTop, GarbageCan, Dresser",
+ArmChair,"Living Rooms (27/30)
+Bedrooms (6/30)","Receptacle, Moveable",Temperature,,
+BaseballBat,Bedrooms (13/30),Pickupable,Temperature,"Bed, DiningTable, TVStand, CoffeeTable, SideTable, Desk, CounterTop",
+BasketBall,Bedrooms (11/30),Pickupable,Temperature,"Sofa, ArmChair, Dresser, Desk, Bed, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop",
+Bathtub,Bathrooms (21/30),Receptacle (Some),Temperature,,
+BathtubBasin,Bathrooms (19/30),Receptacle,"Temperature, Inherited: Bathtub",,
+Bed,Bedrooms (All),"Receptacle, Dirtyable",Temperature,,
+Blinds,"Kitchens (5/30)
+Living Rooms (1/30)
+Bedrooms (27/30)",Openable,Temperature,,
+Book,"Kitchens (2/30)
+Living Rooms (7/30)
+Bedrooms (All)","Openable, Pickupable","Temperature, Mass, SalientMaterials","Sofa, ArmChair, Box, Ottoman, Dresser, Desk, Bed, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer",
+Boots,"Living Rooms (5/30)
+Bedrooms (3/30)",Pickupable,"Temperature, Mass, SalientMaterials",,
+Bottle,Kitchens (7/30),"Pickupable, Fillable, Breakable","Temperature, Mass, SalientMaterials","Fridge, Box, Dresser, Desk, Sink, SinkBasin, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, GarbageCan",Will break if subjected to enough force. Will fill up with water if moved underneath a running water source.
+Bowl,"Kitchens (All)
+Living Rooms (5/30)
+Bedrooms (13/30)","Pickupable, Receptacle, Fillable, Breakable (Some), Dirtyable","Temperature, Mass, SalientMaterials","Microwave, Fridge, Dresser, Desk, Sink, SinkBasin, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf","Will automatically break if subjected to enough force. Not all bowls are breakable (Plastic-Unbreakable vs Glass-Breakable vs Ceramic-Breakable). If empty, will fill up with water if moved underneath a running water source. If in the Dirty state, will automatically become Clean if moved under running water."
+Box,"Living Rooms (All)
+Bedrooms (12/30)","Openable, Pickupable, Receptacle","Temperature, Mass, SalientMaterials","Sofa, ArmChair, Dresser, Desk, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Ottoman",
+Bread,Kitchens (All),"Pickupable, Sliceable","Temperature, Mass, SalientMaterials","Microwave, Fridge, DiningTable, TVStand, CoffeeTable, SideTable, Desk, CounterTop, GarbageCan, Plate",
+BreadSliced*,Kitchens (All),"Pickupable, Cookable","Temperature, Mass, SalientMaterials, Inherited: Slice (Bread)","Microwave, Fridge, DiningTable, TVStand, CoffeeTable, SideTable, Desk, CounterTop, GarbageCan, Toaster, Plate","Use PutObject action to place BreadSliced into Toaster objects. If the Toaster is on, the BreadSliced will automatically cook. BreadSliced will also automatically cook if moved over an active StoveBurner object."
+ButterKnife,Kitchens (All),Pickupable,"Temperature, Mass, SalientMaterials","Pot, Pan, Bowl, Mug, Plate, Cup, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, Desk, CounterTop, Drawer",
+Cabinet,"Kitchens (All)
+Living Rooms (6/30)
+Bedrooms (5/30)
+Bathrooms (15/30)","Openable, Receptacle",Temperature,,
+Candle,"Living Rooms (3/30)
+Bathrooms (All)","Pickupable, Toggleable","Temperature, Mass, SalientMaterials","Box, Dresser, Desk, Toilet, Cart, Bathtub, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer","Can be lit using the ToggleObjectOn action. If another source of flame (another Candle or a Stove Burner) touches the wick, the Candle will automatically be lit and turn on. If the wick of the Candle touches a source of water, then the Candle will automatically be put out and turned off."
+CD,Bedrooms (All),Pickupable,"Temperature, Mass, SalientMaterials","Box, Ottoman, Dresser, Desk, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, GarbageCan, Safe, Sofa, ArmChair",
+CellPhone,"Kitchens (4/30)
+Living Rooms (7/30)
+Bedrooms (All)","Pickupable, Toggleable, Breakable","Temperature, Mass, SalientMaterials","Sofa, ArmChair, Box, Ottoman, Dresser, Desk, Bed, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, Safe","Will automatically break if subjected to enough force. When broken, the CellPhone’s screen will appear cracked and the On/Off state will be switched to Off. Broken CellPhones will no longer be able to turn on with ToggleObjectOn."
+Chair,"Kitchens (12/30)
+Living Rooms (20/30)
+Bedrooms (22/30)",Moveable,"Temperature, Mass",,
+Cloth,"Bedrooms (5/30)
+Bathrooms (All)","Pickupable, Dirtyable","Temperature, Mass, SalientMaterials","Sofa, ArmChair, Box, Ottoman, Dresser, LaundryHamper, Desk, Toilet, Cart, BathtubBasin, Bathtub, Sink, SinkBasin, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, GarbageCan","If in the Dirty state, will automatically become Clean if moved under running water."
+CoffeeMachine,Kitchens (All),"Toggleable, Receptacle, Moveable","Temperature, ChangeTemp",,"Coffee Machines are receptacles but only allow objects of type Mug to be placed in them. If a Coffee Machine is On and an empty Mug is placed in it, the Mug will automatically fill with Coffee and have its Temperature changed to Hot"
+CoffeeTable,"Living Rooms (24/30)
+Bedrooms (1/30)","Receptacle, Moveable",Temperature,,
+CounterTop,"Kitchens (All)
+Bedrooms (1/30)
+Bathrooms (25/30)",Receptacle,Temperature,,
+CreditCard,"Kitchens (3/30)
+Living Rooms (All)
+Bedrooms (All)",Pickupable,"Temperature, Mass, SalientMaterials","Sofa, ArmChair, Box, Ottoman, Dresser, Desk, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, Shelf",
+Cup,Kitchens (All),"Pickupable, Receptacle, Fillable, Breakable (Some), Dirtyable","Temperature, Mass, SalientMaterials","Microwave, Fridge, Dresser, Desk, Sink, SinkBasin, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf","Will automatically break if subjected to enough force. Not all Cups are breakable (Plastic-Unbreakable vs Glass-Breakable vs Ceramic-Breakable). If empty, will fill up with water if moved underneath a running water source. If in the Dirty state, will automatically become Clean if moved under running water."
+Curtains,"Kitchens (2/30)
+Living Rooms (10/30)
+Bedrooms (2/30)",,Temperature,,
+Desk,"Living Rooms (2/30)
+Bedrooms (24/30)","Receptacle, Moveable",Temperature,,
+DeskLamp,"Living Rooms (13/30)
+Bedrooms (All)","Toggleable, Moveable",Temperature,,
+Desktop,Bedrooms (2/30),Moveable,"Temperature, Mass, SalientMaterials",,
+DiningTable,"Kitchens (16/30)
+Living Rooms (14/30)","Receptacle, Moveable",Temperature,,
+DishSponge,"Kitchens (All)
+Bathrooms (6/30)",Pickupable,"Temperature, Mass, SalientMaterials","Pot, Pan, Bowl, Plate, Box, Toilet, Cart, Cart, BathtubBasin, Bathtub, Sink, SinkBasin, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, GarbageCan",
+DogBed,"Living Rooms (2/30)
+Bedrooms (1/30)",Moveable,"Temperature, Mass, SalientMaterials",,
+Drawer,"Kitchens (28/30)
+Living Rooms (23/30)
+Bedrooms (29/30)
+Bathrooms (15/30)","Openable, Receptacle",Temperature,,
+Dresser,"Living Rooms (10/30)
+Bedrooms (11/30)
+Bathrooms (2/30)","Receptacle, Moveable",Temperature,,
+Dumbbell,Bedrooms (4/30),Pickupable,"Temperature, Mass, SalientMaterials",,
+Egg,Kitchens (All),"Pickupable, Sliceable, Breakable","Temperature, Mass, SalientMaterials","Pot, Pan, Bowl, Microwave, Fridge, Plate, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, GarbageCan",Using the Slice action or the Break action will change the Egg to an EggCracked object. Dropping or Throwing the Egg with enough force will also automatically Break the egg into an EggCracked.
+EggCracked*,Kitchens (All),"Pickupable, Cookable","Temperature, Mass, SalientMaterials, Inherited: Slice (Egg), Inherited: Break (Egg)","Pot, Pan, Bowl, Microwave, Fridge, Plate, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, GarbageCan","Placing an EggCracked object onto an active StoveBurner will automatically cook it. Placing an EggCracked object into a Microwave, and then turning on the Microwave will automatically cook it."
+Faucet,"Kitchens (All)
+Bathrooms (All)",Toggleable,Temperature,,"Can be turned on with ToggleObjectOn action. When on, a stream of running water will pour out from the faucet spout. If the Faucet is over a Sink or a Bathtub, the interior of the Sink/Bathtub will fill with standing water. For objects that can be automatically cleaned, the stream of water is a Running Water Source"
+Floor,"Kitchens (All)
+Living Rooms (All)
+Bedrooms (All)
+Bathrooms (All)",,Temperature,,
+FloorLamp,Living Rooms (All),"Toggleable, Moveable",Temperature,,
+Footstool,"Bedrooms (1/30)
+Bathrooms (1/30)",Moveable,Temperature,,
+Fork,Kitchens (All),Pickupable,"Temperature, Mass, SalientMaterials","Pot, Pan, Bowl, Mug, Plate, Cup, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Drawer",
+Fridge,Kitchens (All),"Openable, Receptacle","Temperature, ChangeTemp",,Objects placed in a Fridge will have their temperature automatically changed to Cold
+GarbageBag,"Kitchens (3/30)
+Bedrooms (3/30)",Moveable,"Temperature, Mass, SalientMaterials",,
+GarbageCan,"Kitchens (All)
+Living Rooms (All)
+Bedrooms (All)
+Bathrooms (All)","Receptacle, Moveable",Temperature,,
+HandTowel,Bathrooms (All),Pickupable,"Temperature, Mass, SalientMaterials",HandTowelHolder,
+HandTowelHolder,Bathrooms (All),Receptacle,Temperature,,"HandTowelHolders are recptacle objects, but only allow HandTowel type objects to be placed on them."
+HousePlant,"Kitchens (10/30)
+Living Rooms (All)
+Bedrooms (7/30)
+Bathrooms (1/30)","Fillable, Moveable",Temperature,,Will fill up with water if moved underneath a running water source.
+Kettle,Kitchens (15/30),"Openable, Pickupable, Fillable","Temperature, Mass, SalientMaterials","DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Sink, SinkBasin, Cabinet, StoveBurner, Shelf",Will fill up with water if moved underneath a running water source.
+KeyChain,"Living Rooms (All)
+Bedrooms (All)",Pickupable,"Temperature, Mass, SalientMaterials","Sofa, ArmChair, Box, Ottoman, Dresser, Desk, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, Safe",
+Knife,Kitchens (All),Pickupable,"Temperature, Mass, SalientMaterials","Pot, Pan, Bowl, Mug, Plate, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Drawer",
+Ladle,Kitchens (10/30),Pickupable,"Temperature, Mass, SalientMaterials","Pot, Pan, Bowl, Plate, Sink, SinkBasin, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Drawer",
+Laptop,"Living Rooms (All)
+Bedrooms (All)","Openable, Pickupable, Toggleable, Breakable","Temperature, Mass, SalientMaterials","Sofa, ArmChair, Ottoman, Dresser, Desk, Bed, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop","Will automatically break if subjected to enough force. When broken, the Laptop’s screen will appear cracked and the On/Off state will be switched to Off. Broken Laptops will no longer be able to turn on with ToggleObjectOn, but they can still be opened or closed with OpenObject or CloseObject."
+LaundryHamper,Bedrooms (8/30),"Receptacle, Moveable",Temperature,,
+Lettuce,Kitchens (All),"Pickupable, Sliceable","Temperature, Mass, SalientMaterials","Pot, Pan, Bowl, Fridge, Plate, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, GarbageCan",
+LettuceSliced*,Kitchens (All),Pickupable,"Temperature, Mass, SalientMaterials, Inherited: Slice (Lettuce)","Pot, Pan, Bowl, Fridge, Plate, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, GarbageCan",
+LightSwitch,"Kitchens (All)
+Living Rooms (All)
+Bedrooms (All)
+Bathrooms (All)",Toggleable,Temperature,,
+Microwave,Kitchens (All),"Openable, Toggleable, Receptacle, Moveable","Temperature, ChangeTemp",,"Any objects inside a Microwave while it is turned On will have their temperature changed to Hot. Some object will also automatically cook (Potato, Egg). Microwaves cannot be turned on if they are open, and cannot be opened if they are currently on."
+Mirror,"Kitchens (2/30)
+Living Rooms (3/30)
+Bedrooms (All)
+Bathrooms (All)","Breakable, Dirtyable",Temperature,,"Automatically breaks if subjected to enough force. For example, if an object thrown at it has enough force, the object may break."
+Mug,"Kitchens (All)
+Bedrooms (16/30)","Pickupable, Receptacle, Fillable, Breakable, Dirtyable","Temperature, Mass, SalientMaterials","SinkBasin, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf","Will automatically break if subjected to enough force. Not all Mugs are breakable (Plastic-Unbreakable vs Glass-Breakable vs Ceramic-Breakable). If empty, will fill up with water if moved underneath a running water source. If in the Dirty state, will automatically become Clean if moved under running water. If empty and placed in a CoffeeMachine that is on, will automatically fill with Coffee and have temperature changed to Hot"
+Newspaper,Living Rooms (18/30),Pickupable,"Temperature, Mass, SalientMaterials","Sofa, ArmChair, Ottoman, Dresser, Desk, Bed, Toilet, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, GarbageCan",
+Ottoman,Living Rooms (4/30),"Receptacle, Moveable",Temperature,,
+Painting,"Living Rooms (All)
+Bedrooms (13/30)
+Bathrooms (1/30)",,Temperature,,
+Pan,Kitchens (All),"Pickupable, Receptacle, Dirtyable","Temperature, Mass, SalientMaterials","DiningTable, CounterTop, TVStand, CoffeeTable, SideTable, Sink, SinkBasin, Cabinet, StoveBurner, Fridge","If in the Dirty state, will automatically become Clean if moved under running water."
+PaperTowelRoll,"Kitchens (10/30)
+Bathrooms (4/30)","Pickupable, UsedUp","Temperature, Mass, SalientMaterials",,
+Pen,"Kitchens (2/30)
+Living Rooms (5/30)
+Bedrooms (All)",Pickupable,"Temperature, Mass, SalientMaterials","Mug, Box, Dresser, Desk, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, GarbageCan",
+Pencil,"Kitchens (2/30)
+Living Rooms (4/30)
+Bedrooms (All)",Pickupable,"Temperature, Mass, SalientMaterials","Mug, Box, Dresser, Desk, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, GarbageCan",
+PepperShaker,Kitchens (All),Pickupable,"Temperature, Mass, SalientMaterials","DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Drawer, Cabinet, Shelf",
+Pillow,"Living Rooms (All)
+Bedrooms (All)",Pickupable,"Temperature, Mass, SalientMaterials","Sofa, ArmChair, Ottoman, Bed",
+Plate,"Kitchens (All)
+Living Rooms (10/30)","Pickupable, Receptacle, Breakable (Some), Dirtyable","Temperature, Mass, SalientMaterials","Microwave, Fridge, Dresser, Desk, Sink, Sink, SinkBasin, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf","Will automatically break if subjected to enough force. Not all Plates are breakable (Plastic-Unbreakable vs Glass-Breakable vs Ceramic-Breakable). If in the Dirty state, will automatically become Clean if moved under running water."
+Plunger,Bathrooms (All),Pickupable,"Temperature, Mass, SalientMaterials","Cart, Cabinet",
+Poster,Bedrooms (6/30),,Temperature,,
+Pot,Kitchens (All),"Pickupable, Receptacle, Fillable, Dirtyable","Temperature, Mass, SalientMaterials","StoveBurner, Fridge, Sink, SinkBasin, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf","If empty, will fill up with water if moved underneath a running water source. If in the Dirty state, will automatically become Clean if moved under running water."
+Potato,Kitchens (All),"Pickupable, Sliceable, Cookable","Temperature, Mass, SalientMaterials","Pot, Pan, Bowl, Microwave, Fridge, Plate, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, GarbageCan","Will automatically be Cooked if placed over an active Stove Burner or in a turned on Microwave. When Sliced, will create multiple PotatoSliced objects. Cooking the Potato first and then Slicing it will result in Cooked PotatoSliced objects."
+PotatoSliced*,Kitchens (All),"Pickupable, Cookable","Temperature, Mass, SalientMaterials, Inherited: Slice (Potato)","Pot, Pan, Bowl, Microwave, Fridge, Plate, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, GarbageCan",Will automatically be Cooked if placed over an active Stove Burner or in a turned on Microwave.
+RemoteControl,"Living Rooms (All)
+Bedrooms (3/30)",Pickupable,"Temperature, Mass, SalientMaterials","Sofa, ArmChair, Box, Ottoman, Dresser, Desk, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer",
+RoomDecor,Living Rooms (2/30),Moveable,"Temperature, Mass, SalientMaterials",,
+Safe,"Kitchens (1/30)
+Living Rooms (2/30)
+Bedrooms (5/30)","Openable, Receptacle, Moveable",Temperature,,
+SaltShaker,Kitchens (All),Pickupable,"Temperature, Mass, SalientMaterials","DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Drawer, Cabinet, Shelf",
+ScrubBrush,Bathrooms (All),Pickupable,"Temperature, Mass, SalientMaterials",,
+Shelf,"Kitchens (9/30)
+Living Rooms (16/30)
+Bedrooms (23/30)
+Bathrooms (7/30)",Receptacle,Temperature,,
+ShelvingUnit,"Kitchens (5/30)
+Living Rooms (5/30)
+Bedrooms (7/30)",Moveable,"Temperature, Mass, SalientMaterials",,
+ShowerCurtain,Bathrooms (13/30),Openable,Temperature,,
+ShowerDoor,Bathrooms (17/30),"Openable, Breakable",Temperature,,"Automatically breaks if subjected to enough force. For example, if an object thrown at it has enough force, the object may break."
+ShowerGlass,Bathrooms (13/30),Breakable,Temperature,,"Automatically breaks if subjected to enough force. For example, if an object thrown at it has enough force, the object may break."
+ShowerHead,Bathrooms (24/30),Toggleable,Temperature,,"Can be turned on with ToggleObjectOn action. When on, a stream of running water will pour out from the ShowerHead. For objects that can be automatically cleaned, the stream of water is a Running Water Source."
+SideTable,"Kitchens (3/30)
+Living Rooms (27/30)
+Bedrooms (23/30)
+Bathrooms (5/30)","Receptacle, Moveable",Temperature,,
+Sink,"Kitchens (All)
+Bathrooms (All)",Receptacle (Some),Temperature,,
+SinkBasin,"Kitchens (All)
+Bathrooms (All)",Receptacle,"Temperature, Inherited: Sink",,
+SoapBar,Bathrooms (All),Pickupable,"Temperature, Mass, SalientMaterials","Toilet, Cart, Bathtub, BathtubBasin, Sink, SinkBasin, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, GarbageCan",
+SoapBottle,"Kitchens (All)
+Bathrooms (All)","Pickupable, UsedUp (Some)","Temperature, Mass, SalientMaterials","Dresser, Desk, Toilet, Cart, Bathtub, Sink, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, GarbageCan",
+Sofa,"Living Rooms (All)
+Bedrooms (1/30)","Receptacle, Moveable",Temperature,,
+Spatula,Kitchens (All),Pickupable,"Temperature, Mass, SalientMaterials","Pot, Pan, Bowl, Plate, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Drawer",
+Spoon,Kitchens (All),Pickupable,"Temperature, Mass, SalientMaterials","Pot, Pan, Bowl, Mug, Plate, Cup, Sink, SinkBasin, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Drawer",
+SprayBottle,"Kitchens (2/30)
+Bathrooms (All)",Pickupable,"Temperature, Mass, SalientMaterials","Dresser, Desk, Toilet, Cart, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, GarbageCan",
+Statue,"Kitchens (4/30)
+Living Rooms (29/30)
+Bedrooms (4/30)","Pickupable, Breakable","Temperature, Mass, SalientMaterials","Box, Dresser, Desk, Cart, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Safe","Will automatically break if subjected to enough force, for example if dropped from a high enough distance"
+Stool,"Kitchens (14/30)
+Living Rooms (2/30)
+Bedrooms (1/30)",Moveable,"Temperature, Mass, SalientMaterials",,
+StoveBurner,Kitchens (All),"Toggleable, Receptacle","Temperature, ChangeTemp",,"While this object type can be turned on/off, the ToggleObjectOn and ToggleObjectOff actions will not work on it directly. All StoveBurners are controlled by the on/off state of a StoveKnob object. Turning on/off the StoveKnob will automatically turn on/off the StoveBurner that it is linked to. Objects placed over an active StoveBurner will have their temperature changed to Hot. Some objects can be automatically cooked over an active StoveBurner (Potato, BreadSliced). StoveBurners are receptacles but only allow objects of type Pot, Pan, and Kettle to be placed on them directly. StoveBurners are also sources of fire and can light Candles if the wick of the candle is moved over the burner"
+StoveKnob,Kitchens (All),Toggleable,Temperature,,All StoveKnobs control the on/off state of themselves and a linked StoveBurner.
+TableTopDecor,Bedrooms (1/30),Pickupable,"Temperature, Mass, SalientMaterials",,
+TeddyBear,Bedrooms (10/30),Pickupable,"Temperature, Mass, SalientMaterials","Bed, Sofa, ArmChair, Ottoman, Dresser, Desk, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Safe",
+Television,"Living Rooms (All)
+Bedrooms (3/30)","Toggleable, Breakable, Moveable",Temperature,,"Will automatically break if subjected to enough force. When broken, the Television’s screen will appear cracked and the On/Off state will be switched to Off. Broken Televisions will no longer be able to turn on with ToggleObjectOn."
+TennisRacket,Bedrooms (10/30),Pickupable,"Temperature, Mass, SalientMaterials","Dresser, Desk, Bed, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop",
+TissueBox,"Living Rooms (9/30)
+Bedrooms (4/30)
+Bathrooms (9/30)","Pickupable, UsedUp (Some)","Temperature, Mass, SalientMaterials","Box, Dresser, Desk, Toilet, Cart, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, GarbageCan",
+Toaster,Kitchens (All),"Toggleable, Receptacle, Moveable","Temperature, ChangeTemp",,Toasters are receptacles but only allow BreadSliced objects to be placed in them. Any BreadSliced object in a Toaster that is turned on will automatically be Cooked.
+Toilet,Bathrooms (All),"Openable, Receptacle",Temperature,,
+ToiletPaper,Bathrooms (All),"Pickupable, UsedUp","Temperature, Mass, SalientMaterials","Dresser, Desk, Toilet, ToiletPaperHanger, Cart, Bathtub, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, GarbageCan",
+ToiletPaperHanger,Bathrooms (All),Receptacle,Temperature,,ToiletPaperHangers are receptacles but only allow ToiletPaper objects to be placed in them
+Tomato,Kitchens (All),"Pickupable, Sliceable","Temperature, Mass, SalientMaterials","DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Sink, SinkBasin, Pot, Bowl, Fridge, GarbageCan, Plate","When Sliced, will create multiple TomatoSliced objects."
+TomatoSliced*,Kitchens (All),Pickupable,"Temperature, Mass, SalientMaterials, Inherited: Slice (Tomato)","DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Sink, SinkBasin, Pot, Bowl, Fridge, GarbageCan, Plate",
+Towel,Bathrooms (All),Pickupable,"Temperature, Mass, SalientMaterials",TowelHolder,
+TowelHolder,Bathrooms (All),Receptacle,Temperature,,TowelHolders are receptacles but only allow Towel objects to be placed in them.
+TVStand,Living Rooms (12/30),"Receptacle, Moveable",Temperature,,
+VacuumCleaner,Bedrooms (1/30),Moveable,"Temperature, Mass, SalientMaterials",,
+Vase,"Kitchens (6/30)
+Living Rooms (18/30)
+Bedrooms (3/30)","Pickupable, Breakable","Temperature, Mass, SalientMaterials","Box, Dresser, Desk, Cart, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Safe",Will automaticaly break if subjected to enough force.
+Watch,Living Rooms (Some),Pickupable,"Temperature, Mass, SalientMaterials","Box, Dresser, Desk, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer, Safe",
+WateringCan,Living Rooms (13/30),"Pickupable, Fillable","Temperature, Mass, SalientMaterials","Dresser, Desk, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, Drawer","If empty, will automatically fill with water if placed under a running water source."
+Window,"Kitchens (26/30)
+Living Rooms (28/30)
+Bedrooms (All)
+Bathrooms (19/30)",Breakable,Temperature,,Will automatically break if subjected to enough force.
+WineBottle,Kitchens (10/30),"Pickupable, Fillable, Breakable","Temperature, Mass, SalientMaterials","Fridge, Dresser, Desk, Cabinet, DiningTable, TVStand, CoffeeTable, SideTable, CounterTop, Shelf, GarbageCan","Will automatically break if subjected to enough force. If empty, will automatically fill with water if placed under a running water source."
