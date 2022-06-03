@@ -13,9 +13,9 @@ from tensorboardX import SummaryWriter
 
 pattern = r"[^A-z]*([0-9])\.([A-z]+)\((.*)\)"
 
-successes = {}
-failures = {}
-accuracies = {}
+successes = [{}, {}, {}]
+failures = [{}, {}, {}]
+accuracies = [{}, {}, {}]
 
 
 def proc_instructions(instructions):
@@ -30,7 +30,7 @@ def proc_instructions(instructions):
     return ()
 
 
-def proc_eval(labels, preds):
+def proc_eval(i, labels, preds):
     failed_acts = 0
     failed_args = 0
     labels = list(labels)
@@ -43,59 +43,59 @@ def proc_eval(labels, preds):
         expert_args = label['args']
 
         if act_ == expert_act:
-            act_entry = {expert_act: successes.get(expert_act, 0) + 1}
-            successes.update(act_entry)
+            act_entry = {expert_act: successes[i].get(expert_act, 0) + 1}
+            successes[i].update(act_entry)
         else:
             failed_acts += 1
-            act_entry = {expert_act: failures.get(expert_act, 0) + 1}
-            failures.update(act_entry)
+            act_entry = {expert_act: failures[i].get(expert_act, 0) + 1}
+            failures[i].update(act_entry)
 
         if args_ == expert_args:
-            args_entry = {expert_act+"_args": successes.get(expert_act+"_args", 0) + 1}
-            successes.update(args_entry)
+            args_entry = {expert_act+"_args": successes[i].get(expert_act+"_args", 0) + 1}
+            successes[i].update(args_entry)
         else:
             failed_args += 1
-            args_entry = {expert_act+"_args": failures.get(expert_act+"_args", 0) + 1}
-            failures.update(args_entry)
+            args_entry = {expert_act+"_args": failures[i].get(expert_act+"_args", 0) + 1}
+            failures[i].update(args_entry)
 
     if not failed_acts:
-        plan_entry = {'0STEPS': successes.get('0STEPS', 0) + 1}
-        successes.update(plan_entry)
+        plan_entry = {'0STEPS': successes[i].get('0STEPS', 0) + 1}
+        successes[i].update(plan_entry)
     else:
-        plan_entry = {'0STEPS': failures.get('0STEPS', 0) + 1}
-        failures.update(plan_entry)
+        plan_entry = {'0STEPS': failures[i].get('0STEPS', 0) + 1}
+        failures[i].update(plan_entry)
 
     if not failed_args:
-        args_entry = {'1ARGS': successes.get('1ARGS', 0) + 1}
-        successes.update(args_entry)
+        args_entry = {'1ARGS': successes[i].get('1ARGS', 0) + 1}
+        successes[i].update(args_entry)
     else:
-        args_entry = {'1ARGS': failures.get('1ARGS', 0) + 1}
-        failures.update(args_entry)
+        args_entry = {'1ARGS': failures[i].get('1ARGS', 0) + 1}
+        failures[i].update(args_entry)
 
     if not failed_acts and not failed_args:
-        full_entry = {'2PLAN': successes.get('2PLAN', 0) + 1}
-        successes.update(full_entry)
+        full_entry = {'2PLAN': successes[i].get('2PLAN', 0) + 1}
+        successes[i].update(full_entry)
     else:
-        full_entry = {'2PLAN': failures.get('2PLAN', 0) + 1}
-        failures.update(full_entry)
+        full_entry = {'2PLAN': failures[i].get('2PLAN', 0) + 1}
+        failures[i].update(full_entry)
 
-    for k in failures:
-        if k not in successes:
+    for k in failures[i]:
+        if k not in successes[i]:
             continue
-        accuracies[k] = successes[k] / (successes[k] + failures[k])
+        accuracies[i][k] = successes[i][k] / (successes[i][k] + failures[i][k])
 
 
-def print_stats(savefile=None):
+def print_stats(i, savefile=None):
     header = "KEY ACCURACY SUCCESSES FAILURES\n"
     if savefile is None:
         print(header)
-        for k in sorted(accuracies):
-            print(k, accuracies[k], successes[k], failures[k])
+        for k in sorted(accuracies[i]):
+            print(k, accuracies[i][k], successes[i][k], failures[i][k])
     else:
         with open(savefile, 'w') as f:
             f.write(header)
-            for k in sorted(accuracies):
-                f.write(f"{k} {accuracies[k]} {successes[k]} {failures[k]}\n")
+            for k in sorted(accuracies[i]):
+                f.write(f"{k} {accuracies[i][k]} {successes[i][k]} {failures[i][k]}\n")
 
 
 if __name__ == "__main__":
@@ -103,6 +103,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', help='specify train dataset json')
     parser.add_argument('--eval', help='specify valid dataset json')
+    parser.add_argument('--eval_topk', type=int, help='use topk sampling')
     parser.add_argument('--gen', help='specify test dataset json')
     parser.add_argument('--chkpt_path', default="checkpoints/model.pt")
     parser.add_argument('--prompt')
@@ -137,18 +138,18 @@ if __name__ == "__main__":
         dl = DataLoader(ds, shuffle=True, batch_size=2)
 
         num_epochs = 3
-        numing_steps = num_epochs * len(dl)
+        num_training_steps = num_epochs * len(dl)
 
         optimizer = AdamW(model.parameters(), lr=5e-5)
         lr_scheduler = get_scheduler(
-            name="linear", optimizer=optimizer, num_warmup_steps=0, numing_steps=numing_steps
+            name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
         )
 
         torch.save(model.state_dict(), args.chkpt_path)
         model.train()
 
         writer = SummaryWriter('runs/test1')
-        progress = tqdm(range(numing_steps))
+        progress = tqdm(range(num_training_steps))
         for epoch in range(num_epochs):
             for batch in dl:
                 batch = {k: v.to(device) for k, v in batch.items()}
@@ -188,30 +189,29 @@ if __name__ == "__main__":
         for batch in dl:
             #batch = {k: v.to(device) for k, v in batch.items()}
 
-            outputs = model.generate(batch['input_ids'].to(device), do_sample=False, max_length=200)
-            #preds = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-            #outputs = model(batch['input_ids'].to(device))
-            #preds = torch.argmax(outputs.logits, dim=-1).squeeze()
+            if args.eval_topk:
+                outputs = model.generate(batch['input_ids'].to(device), do_sample=True, top_k=10, top_p=0.92, num_return_sequences=3, max_length=200)
+            else:
+                outputs = model.generate(batch['input_ids'].to(device), do_sample=False, max_length=200)
 
-            labels = batch['labels'].squeeze()
-            preds = outputs.squeeze()#[:len(labels)]
-            #labels = batch['instructions'][0][:-1]
+            labels = batch['labels']
+            label_text = tokenizer.batch_decode(labels, skip_special_tokens=True)
+            preds_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
-            label_text = tokenizer.decode(labels, skip_special_tokens=True)
-            pred_text = tokenizer.decode(preds, skip_special_tokens=True)
+            labels = labels.squeeze()
+            label_text = label_text[0]
 
-            proc_eval(proc_instructions(label_text), proc_instructions(pred_text))
+            for i, (pred, pred_text) in enumerate(zip(outputs, preds_text)):
+                proc_eval(i, proc_instructions(label_text), proc_instructions(pred_text))
 
-            #import pdb; pdb.set_trace()
+                score = metric.add_batch(predictions=pred[:len(labels)], references=labels)
+                if progress.n % 20 == 0:
+                    print_stats(i)
 
-            score = metric.add_batch(predictions=preds[:len(labels)], references=labels)
-            #for l, p in zip(batch['labels'], preds):
-            #    metric.add_batch(predictions=p, references=l)
             progress.update(1)
 
-            if progress.n % 20 == 0:
-                print_stats()
-        print_stats(savefile=args.eval+".results.txt")
+        for i in range(3):
+            print_stats(i, savefile=f"{args.eval}{i}.results.txt")
 
         score = metric.compute()
         print(score)
