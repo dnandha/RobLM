@@ -10,22 +10,27 @@ args = parser.parse_args()
 
 
 class Result(object):
-    def __init__(self, task, goal, instructions, actions):
-        self.task = task
+    def __init__(self, goal, task, scene, instructions, actions):
         self.goal = goal
+        self.task = task
+        self.scene = scene
         self.instructions = instructions
         self.actions = actions
 
-    def to_json(self):
+    def to_json(self, condition=False):
         task = {
             'goal': self.goal,
             'type': self.task,
+            'scene': self.scene,
             'subgoals': [],
             'instructions': ""
         }
 
         if self.actions is not None:
-            task['instructions'] = self.goal.replace(".", ":\n")
+            task['instructions'] = ""
+            if condition:
+                task['instructions'] += f"{self.scene}>"
+            task['instructions'] += self.goal.replace(".", ":\n")
             for i, (instr, act) in enumerate(zip(self.instructions, self.actions)):
                 task['subgoals'] += [{
                     'instruction': instr,
@@ -52,6 +57,8 @@ def parse_file(file_):
     if 'task_type' in data:
         ttype = data['task_type']
 
+    scene = data['scene']['scene_num']
+
     acts = None
     if plan:
         acts = []
@@ -72,13 +79,13 @@ def parse_file(file_):
 
         #for act, instr in zip(acts, instrs):
             #print(act, instr)
-        yield Result(ttype, goal, instrs, acts)
+        yield Result(goal, ttype, scene, instrs, acts)
 
 
 max_samples = 100000
 i = 0
 
-dpath = osp.join(args.dataset_path, "**/traj_data.json")
+dpath = osp.join(args.dataset_path, "*/*/traj_data.json")
 
 tasks = []
 for path in glob(dpath):
@@ -87,7 +94,7 @@ for path in glob(dpath):
         break
     with open(path) as f:
         for res in parse_file(f):
-            tasks += [res.to_json()]
+            tasks += [res.to_json(condition=True)]
 
 with open(args.outfile, 'w') as outfile:
     json.dump(tasks, outfile)
