@@ -79,9 +79,13 @@ def proc_eval(i, labels, preds):
         full_entry = {'2PLAN': failures[i].get('2PLAN', 0) + 1}
         failures[i].update(full_entry)
 
+    for k in successes[i]:
+        if k not in failures[i]:
+            failures[i][k] = 0
+        accuracies[i][k] = successes[i][k] / (successes[i][k] + failures[i][k])
     for k in failures[i]:
         if k not in successes[i]:
-            continue
+            successes[i][k] = 0
         accuracies[i][k] = successes[i][k] / (successes[i][k] + failures[i][k])
 
 
@@ -102,6 +106,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', help='specify train dataset json')
+    parser.add_argument('--log', help='logfile for tensorboard')
     parser.add_argument('--eval', help='specify valid dataset json')
     parser.add_argument('--eval_topk', type=int, help='use topk sampling')
     parser.add_argument('--gen', help='specify test dataset json')
@@ -148,7 +153,7 @@ if __name__ == "__main__":
         torch.save(model.state_dict(), args.chkpt_path)
         model.train()
 
-        writer = SummaryWriter('runs/test1')
+        writer = SummaryWriter(args.log)
         progress = tqdm(range(num_training_steps))
         for epoch in range(num_epochs):
             for batch in dl:
@@ -166,7 +171,8 @@ if __name__ == "__main__":
             torch.save(model.state_dict(), args.chkpt_path)
     elif args.eval:
         def tokenize(e):
-            f = tokenizer(e['goal'].replace(".",":"))
+            #f = tokenizer(e['goal'].replace(".",":"))
+            f = tokenizer(e['instructions'].split(":")[0]+":")  # TODO
             f['labels'] = tokenizer(e['instructions'])['input_ids']
             return f
 
