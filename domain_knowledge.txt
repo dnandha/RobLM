@@ -1,0 +1,9 @@
+https://github.com/askforalfred/alfred/blob/f2de579cdc812f8adf3ce4999f4eb6fb45339c0e/gen/constants.py
+
+SCENE_TYPE = {"Kitchen": range(1, 31),
+              "LivingRoom": range(201, 231),
+              "Bedroom": range(301, 331),
+              "Bathroom": range(401, 431)}
+
+
+...
