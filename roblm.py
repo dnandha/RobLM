@@ -1,3 +1,4 @@
+import os
 import re
 import torch
 import pandas as pd
@@ -11,23 +12,67 @@ from transformers import get_scheduler
 from tensorboardX import SummaryWriter
 
 
-pattern = r"[^A-z]*([0-9])\.([A-z]+)\((.*)\)"
+pattern_old = r"[^A-z]*([0-9])\.([A-z]+)\((.*)\)"
+pattern = r"[^A-z]*([0-9])\.([A-z]+)\<(.*)\>"
 
 successes = [{}, {}, {}]
 failures = [{}, {}, {}]
 accuracies = [{}, {}, {}]
 
 
+def create_aux_mask(input_ids):
+    inputs = torch.tensor(input_ids)
+    mask_start = inputs == 27  # <
+    mask_end = inputs == 29  # >
+
+    mask = []
+    toggle = 0
+    for x in mask_start | mask_end:
+        mask += [1 if toggle else 0]
+        if x:
+            toggle = not toggle
+    return mask
+
+
 def proc_instructions(instructions):
     for instr in instructions.split('\n'):
         res = re.match(pattern, instr)
         if not res:
-            continue
+            res = re.match(pattern_old, instr)
+            if not res:
+                continue
         #i = int(res.group(1))
         cmd = res.group(2)
         args = res.group(3).split(",")
         yield {'action': cmd, 'args': args}
-    return ()
+
+
+def aux_loss(labels, preds):
+    success_acts = 0
+    failed_acts = 0
+    success_args = 0
+    failed_args = 0
+
+    for label, pred in zip(list(labels), list(preds)):
+        act_ = pred['action']
+        args_ = pred['args']
+        expert_act = label['action']
+        expert_args = label['args']
+
+        if act_ == expert_act:
+            success_acts += 1
+        else:
+            failed_acts += 1
+
+        if args_ == expert_args:
+            success_args += 1
+        else:
+            failed_args += 1
+
+    acts_loss = failed_acts / (success_acts + failed_acts)
+    args_loss = failed_acts / (success_acts + failed_acts)
+
+    return (acts_loss + args_loss) / 2.
 
 
 def proc_eval(i, labels, preds):
@@ -110,7 +155,8 @@ if __name__ == "__main__":
     parser.add_argument('--eval', help='specify valid dataset json')
     parser.add_argument('--eval_topk', type=int, help='use topk sampling')
     parser.add_argument('--gen', help='specify test dataset json')
-    parser.add_argument('--chkpt_path', default="checkpoints/model.pt")
+    parser.add_argument('--chkpt_path', help='model to load', default="checkpoints/model.pt")
+    parser.add_argument('--model_path', help='save path for model', default="checkpoints/model.pt")
     parser.add_argument('--prompt')
     args = parser.parse_args()
 
@@ -119,6 +165,7 @@ if __name__ == "__main__":
     tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
     tokenizer.eos_token = '|'
     tokenizer.pad_token = tokenizer.eos_token
+    #tokenizer.additional_special_tokens = ["<", ">"]
 
     #model = AutoModelForSequenceClassification.from_pretrained("bert-base-cased", num_labels=5)
     model = GPT2LMHeadModel.from_pretrained('gpt2')
@@ -127,22 +174,25 @@ if __name__ == "__main__":
     if args.train:
         def tokenize(e):
             #e = tokenizer(e['goal'], truncation=True, padding='max_length')#, return_tensors='pt')
-            e = tokenizer(e['instructions'], truncation=True, padding='max_length')#, return_tensors='pt')
+            f = tokenizer(e['instructions'], truncation=True, padding='max_length')#, return_tensors='pt')
             #e['labels'] = tokenizer(e['instructions'], truncation=True, padding='max_length', return_tensors='pt')['input_ids']
-            e['labels'] = e['input_ids']
-            return e
+            f['attention_mask_aux'] = create_aux_mask(f['input_ids'])
+            f['labels'] = f['input_ids']
+            return f
 
         model.to(device)
+        if os.path.isfile(args.chkpt_path):
+            print("Restoring checkpoint:", args.chkpt_path)
+            model.load_state_dict(torch.load(args.chkpt_path))
 
         df = pd.read_json(args.train)
         ds = Dataset.from_pandas(df)
         ds = ds.map(tokenize, num_proc=8)
-        #ds = ds.map(tokenize)
-        ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
+        ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'attention_mask_aux', 'labels'])
 
         dl = DataLoader(ds, shuffle=True, batch_size=2)
 
-        num_epochs = 3
+        num_epochs = 2
         num_training_steps = num_epochs * len(dl)
 
         optimizer = AdamW(model.parameters(), lr=5e-5)
@@ -150,7 +200,6 @@ if __name__ == "__main__":
             name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
         )
 
-        torch.save(model.state_dict(), args.chkpt_path)
         model.train()
 
         writer = SummaryWriter(args.log)
@@ -158,8 +207,25 @@ if __name__ == "__main__":
         for epoch in range(num_epochs):
             for batch in dl:
                 batch = {k: v.to(device) for k, v in batch.items()}
-                outputs = model(**batch)
-                loss = outputs.loss
+                outputs_lm = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch['labels'])
+
+                # simply modify the attention mask such that it focuses on the arguments -> most important for successful plan
+                #outputs_aux = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask_aux'], labels=batch['labels'])
+
+                loss = outputs_lm.loss # + outputs_aux.loss
+
+                #import pdb; pdb.set_trace()
+                #preds = torch.argmax(outputs.logits, dim=-1)
+                #res = tokenizer.batch_decode(preds, skip_special_tokens=True)[0]
+
+                #if args.auxloss:
+                #    outputs = model.generate(batch['input_ids'], do_sample=False, max_length=200)
+                #    labels_text = tokenizer.batch_decode(batch['labels'], skip_special_tokens=True)
+                #    preds_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+                #    for label, pred in zip(labels_text, preds_text):
+                #        aux_loss(proc_instructions(label), proc_instructions(pred))
+
                 loss.backward()
                 writer.add_scalar('loss/train', loss.item(), progress.n)
 
@@ -168,7 +234,7 @@ if __name__ == "__main__":
                 optimizer.zero_grad()
                 progress.update(1)
 
-            torch.save(model.state_dict(), args.chkpt_path)
+            torch.save(model.state_dict(), args.model_path)
     elif args.eval:
         def tokenize(e):
             #f = tokenizer(e['goal'].replace(".",":"))
@@ -200,17 +266,16 @@ if __name__ == "__main__":
             else:
                 outputs = model.generate(batch['input_ids'].to(device), do_sample=False, max_length=200)
 
-            labels = batch['labels']
-            label_text = tokenizer.batch_decode(labels, skip_special_tokens=True)
+            label_text = tokenizer.batch_decode(batch['labels'], skip_special_tokens=True)
             preds_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
-            labels = labels.squeeze()
+            labels = batch['labels'].squeeze()
             label_text = label_text[0]
 
             for i, (pred, pred_text) in enumerate(zip(outputs, preds_text)):
                 proc_eval(i, proc_instructions(label_text), proc_instructions(pred_text))
 
-                score = metric.add_batch(predictions=pred[:len(labels)], references=labels)
+                #score = metric.add_batch(predictions=pred[:len(labels)], references=labels)
                 if progress.n % 20 == 0:
                     print_stats(i)
 
@@ -219,8 +284,8 @@ if __name__ == "__main__":
         for i in range(3):
             print_stats(i, savefile=f"{args.eval}{i}.results.txt")
 
-        score = metric.compute()
-        print(score)
+        #score = metric.compute()
+        #print(score)
     elif args.gen:
         def tokenize(e):
             e['input_ids'] = tokenizer(e['goal'].replace(".",":"))['input_ids']
@@ -241,8 +306,7 @@ if __name__ == "__main__":
         progress = tqdm(range(len(dl)))
         for batch in dl:
             batch = {k: v.to(device) for k, v in batch.items()}
-            #outputs = model(batch['input_ids'])
-            #preds = torch.argmax(outputs.logits, dim=-1)
+            outputs = model(batch['input_ids'])
             outputs = model.generate(batch['input_ids'], do_sample=False, max_length=200)
             res = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
             outfile.write(res)

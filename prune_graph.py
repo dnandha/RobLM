@@ -11,6 +11,10 @@ def prune_graph(G, source, target):
 
     # drop target and source node
     pred = [x[1] for x in pred]
+    if source in pred:
+        pred.remove(source)
+    if target in pred:
+        pred.remove(target)
     return source, target, pred
 
 

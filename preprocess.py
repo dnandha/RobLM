@@ -154,6 +154,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("dataset_path")
     parser.add_argument("outfile")
+    parser.add_argument("--split_task", action='store_true')
     parser.add_argument("--cond", help="path to graph")
     parser.add_argument("--floor_plans", help="plans for conditioning")
     #parser.add_argument("--aug", type=int, help="no. of augmentation steps", default=0)
@@ -177,6 +178,11 @@ if __name__ == "__main__":
                     tasks[res.task] = []
                 tasks[res.task] += [res.to_json(condition=domain)]
 
-    for t in tasks:
-        with open(f"{t}_{args.outfile}", 'w') as outfile:
-            json.dump(tasks[t], outfile)
+    if args.split_task:
+        for t in tasks:
+            with open(f"{t}_{args.outfile}", 'w') as outfile:
+                json.dump(tasks[t], outfile)
+    else:
+        with open(args.outfile, 'w') as outfile:
+            for t in tasks:
+                json.dump(tasks[t], outfile)
