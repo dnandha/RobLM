@@ -184,5 +184,4 @@ if __name__ == "__main__":
                 json.dump(tasks[t], outfile)
     else:
         with open(args.outfile, 'w') as outfile:
-            for t in tasks:
-                json.dump(tasks[t], outfile)
+            json.dump(sum(list(tasks.values()), []), outfile)

@@ -175,8 +175,7 @@ if __name__ == "__main__":
         def tokenize(e):
             #e = tokenizer(e['goal'], truncation=True, padding='max_length')#, return_tensors='pt')
             f = tokenizer(e['instructions'], truncation=True, padding='max_length')#, return_tensors='pt')
-            #e['labels'] = tokenizer(e['instructions'], truncation=True, padding='max_length', return_tensors='pt')['input_ids']
-            f['attention_mask_aux'] = create_aux_mask(f['input_ids'])
+            #f['attention_mask_aux'] = create_aux_mask(f['input_ids'])
             f['labels'] = f['input_ids']
             return f
 
@@ -188,7 +187,8 @@ if __name__ == "__main__":
         df = pd.read_json(args.train)
         ds = Dataset.from_pandas(df)
         ds = ds.map(tokenize, num_proc=8)
-        ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'attention_mask_aux', 'labels'])
+        #ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'attention_mask_aux', 'labels'])
+        ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
 
         dl = DataLoader(ds, shuffle=True, batch_size=2)
 
