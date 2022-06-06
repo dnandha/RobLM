@@ -10,8 +10,8 @@ def prune_graph(G, source, target):
     pred = nx.all_simple_paths(G, source=source, target=target, cutoff=2)
 
     # drop target and source node
-    pred = ','.join([x[1] for x in pred])
-    return f"{source}-[{pred}]={target}"
+    pred = [x[1] for x in pred]
+    return source, target, pred
 
 
 if __name__ == "__main__":
