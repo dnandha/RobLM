@@ -8,11 +8,12 @@ from prune_graph import read_graph, prune_graph
 
 
 class Result(object):
-    def __init__(self, goal, task, scene, target, instructions, actions):
+    def __init__(self, goal, task, scene, target, parent, instructions, actions):
         self.goal = goal.strip()
         self.task = task.strip()
         self.scene = int(scene)
         self.target = target
+        self.parent = parent
         self.instructions = [i.strip() for i in instructions]
         self.actions = [a.strip() for a in actions]
 
@@ -46,6 +47,7 @@ class Result(object):
             'type': self.task,
             'scene': self.scene,
             'target': self.target,
+            'parent': self.parent,
             'subgoals': [],
             'instructions': "",  # TODO: rename
         }
@@ -78,6 +80,7 @@ def parse_file(file_):
 
     scene = data['scene']['scene_num']
     target = data['pddl_params']['object_target']
+    parent = data['pddl_params']['parent_target']
 
     acts = None
     if plan:
@@ -99,7 +102,7 @@ def parse_file(file_):
 
         #for act, instr in zip(acts, instrs):
             #print(act, instr)
-        yield Result(goal, ttype, scene, target, instrs, acts)
+        yield Result(goal, ttype, scene, target, parent, instrs, acts)
 
 
 class Domain(object):
@@ -132,7 +135,7 @@ class Domain(object):
             #    with open(filename) as f:
             #        floor_recepts[i] = json.load(f)
 
-    def get_knowledge(self, res):
+    def get_knowledge(self, res, only_parent=True):  # TODO: make only_parent config?
         # source (room) and target (object) can later be infered from image and goal or so
         source = Domain.get_room(res.scene)
         target = res.target
@@ -144,6 +147,9 @@ class Domain(object):
             nodes = [n for n in nodes if n in self.floor_objects[res.scene]]
         #print("3. Remaining nodes after scene specific pruning:", nodes)
         nodes = ",".join(nodes)
+
+        if only_parent:
+            nodes = res.parent if res.parent else 'none'
 
         res = f"{source}-{target}=[{nodes}]".lower()
         #print("3. Result:", res)

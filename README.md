@@ -8,4 +8,10 @@
 `python preprocess.py json_2.1.0/valid_unseen valid_unseen.json --cond knowledge_graph.dot`
 
 ## Training
-`python roblm.py --train traindata.json --chkpt_path checkpoints/model.pt`
+`python roblm.py --train traindata.json [--chkpt_path <path_to_saved_model>] --model_path <path_to_new_model> --log <logdir>
+
+## Evaluation
+0. Complete evaluation
+`python roblm.py --eval validdata.json --chkpt <path_to_saved_model>`
+1. Task based evaluation: validation data split across files
+`for infile in valid/*.json; do python roblm.py --eval $infile --chkpt <path_to_saved_model>; done`
