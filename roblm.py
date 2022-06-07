@@ -156,6 +156,8 @@ if __name__ == "__main__":
 
         #metric = load_metric('glue', 'mrpc')
         metric = load_metric('accuracy')
+        ev = Eval()
+
         progress = tqdm(range(len(dl)))
         for batch in dl:
             #batch = {k: v.to(device) for k, v in batch.items()}
@@ -172,16 +174,16 @@ if __name__ == "__main__":
             label_text = label_text[0]
 
             for i, (pred, pred_text) in enumerate(zip(outputs, preds_text)):
-                Eval.eval(i, Eval.proc_instructions(label_text), Eval.proc_instructions(pred_text))
+                ev.eval(i, Eval.proc_instructions(label_text), Eval.proc_instructions(pred_text))
 
                 #score = metric.add_batch(predictions=pred[:len(labels)], references=labels)
                 if progress.n % 20 == 0:
-                    print_stats(i)
+                    ev.print_stats(i)
 
             progress.update(1)
 
         for i in range(3):
-            print_stats(i, savefile=f"{args.eval}{i}.results.txt")
+            ev.print_stats(i, savefile=f"{args.eval}{i}.results.txt")
 
         #score = metric.compute()
         #print(score)
