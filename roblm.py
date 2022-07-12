@@ -6,7 +6,7 @@ from datasets import load_metric
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
 from tqdm.auto import tqdm
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, GPT2LMHeadModel, GPT2Tokenizer
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, GPT2LMHeadModel, AutoTokenizer
 from transformers import get_scheduler
 from tensorboardX import SummaryWriter
 
@@ -16,10 +16,30 @@ from trl.ppo import PPOTrainer
 from evaluator import Eval
 
 
+def train_tokenizer(tok, df, size=10000):
+    def get_corpus(df):
+        for name, value in df['instructions'].iteritems():
+            yield value
+    ds = get_corpus(df)
+
+    tokenizer = tok.train_new_from_iterator(
+        ds,
+        vocab_size=size,
+        new_special_tokens=[
+            "<BOS>",
+            "<EOS>",
+            "<SEP>",
+        ]
+    )
+    return tokenizer
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--train', help='specify train dataset json')
+    parser.add_argument('--train_tok', help='tune tokenizer')
+    parser.add_argument('--tokdir', help='tokenizer dir', default="")
     parser.add_argument('--train_rl', help='tune model in RL setting')
     parser.add_argument('--train_epochs', type=int, default=2)
     parser.add_argument('--log', help='logfile for tensorboard')
@@ -33,14 +53,22 @@ if __name__ == "__main__":
 
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-    tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-    tokenizer.eos_token = '|'
-    tokenizer.pad_token = tokenizer.eos_token
-    #tokenizer.additional_special_tokens = ["<", ">"]
-
-    #model = AutoModelForSequenceClassification.from_pretrained("bert-base-cased", num_labels=5)
     model = GPT2LMHeadModel.from_pretrained('gpt2')
     named_layers = dict(model.named_modules())
+
+    if not args.train_tok and os.path.isdir(args.tokdir):
+        print("Loading custom tokenizer")
+        tokenizer = AutoTokenizer.from_pretrained(args.tokdir)
+        model.resize_token_embeddings(len(tokenizer))
+    else:
+        tokenizer = AutoTokenizer.from_pretrained('gpt2')
+    #tokenizer.add_special_tokens({'additional_special_tokens': ['<SEP>', '<BOS>', '<EOS>']})
+    #tokenizer.sep_token = '<SEP>'
+    #tokenizer.bos_token = '<BOS>'
+    #tokenizer.eos_token = '<EOS>'
+    tokenizer.pad_token = tokenizer.eos_token
+    print(tokenizer.vocab_size)
+    print(tokenizer.tokenize("cil:lightswitch cjl:garbagecan<BOS>0.GotoLocation<countertop>\n1.PickupObject<butterknife>\n2.GotoLocation<apple>\n"))
 
     if args.train:
         def tokenize(e):
@@ -103,6 +131,10 @@ if __name__ == "__main__":
                 progress.update(1)
 
             torch.save(model.state_dict(), args.model_path)
+    elif args.train_tok:
+        df = pd.read_json(args.train_tok)
+        tokenizer = train_tokenizer(tokenizer, df)
+        tokenizer.save_pretrained(args.tokdir)
     elif args.train_rl:
         def tokenize(e):
             # queries
@@ -158,8 +190,22 @@ if __name__ == "__main__":
             torch.save(model.state_dict(), args.model_path)
     elif args.eval:
         def tokenize(e):
-            #f = tokenizer(e['goal'].replace(".",":"))
-            f = tokenizer(e['instructions'].split(":")[0]+":")  # TODO
+            #instr = e['goal'].replace(".",":")
+            #if not instr.endswith(":"):
+            #    instr += ":"
+            #instr = e['instructions'].split("<BOS>")[0] + "<BOS>"
+            
+            # starting with second step
+            instr = e['instructions'].split("1.")[0] + "1."
+
+            #####
+            #context, goal = instr.split('\n')
+            #context = context.split('-')
+            #context[1] = context[1].split('=')[0]
+            #arg = ','.join(list(Eval.proc_instructions(e['instructions']))[0]['args'])
+            #instr = f"{context[0]}-{context[1]}=[{arg}]\n{goal}"
+            #####
+            f = tokenizer(instr)  # TODO
             f['labels'] = tokenizer(e['instructions'])['input_ids']
             return f
 
@@ -187,20 +233,25 @@ if __name__ == "__main__":
             if args.eval_topk:
                 outputs = model.generate(batch['input_ids'].to(device), do_sample=True, top_k=10, top_p=0.92, num_return_sequences=3, max_length=200)
             else:
-                outputs = model.generate(batch['input_ids'].to(device), do_sample=False, max_length=200)
+                outputs = model.generate(batch['input_ids'].to(device), do_sample=True, max_length=200)
 
             label_text = tokenizer.batch_decode(batch['labels'], skip_special_tokens=True)
-            preds_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            preds_text = tokenizer.batch_decode(outputs, skip_special_tokens=False)
 
             labels = batch['labels'].squeeze()
             label_text = label_text[0]
+            label_text = "0." + label_text.split("0.")[1]
+            #label_text = label_text.split("<EOS")[0].split("<BOS>")[1]
 
             for i, (pred, pred_text) in enumerate(zip(outputs, preds_text)):
+                pred_text = "0." + pred_text.split("0.")[1]
+                print("LBL:", label_text)
+                print("PRD:", pred_text)
                 ev.eval(i, Eval.proc_instructions(label_text), Eval.proc_instructions(pred_text))
 
                 #score = metric.add_batch(predictions=pred[:len(labels)], references=labels)
-                if progress.n % 20 == 0:
-                    ev.print_stats(i)
+                #if progress.n % 20 == 0:
+                ev.print_stats(i)
 
             progress.update(1)
 

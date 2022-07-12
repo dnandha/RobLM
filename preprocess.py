@@ -1,10 +1,11 @@
-import re
+import pandas as pd
 import argparse
 import json
 from glob import glob
 from os import path as osp
 
-from prune_graph import read_graph, prune_graph
+from create_graph import create_knowledge_G, create_scene_G, create_scene_G_floor
+from describe_graph import read_graph, describe_graph, describe_graph_st
 
 
 class Result(object):
@@ -25,11 +26,7 @@ class Result(object):
     def gen_action_sequence(self, imax=0):
         subgoals = []
 
-        if not self.goal.endswith("."):
-            act_seq = self.goal + ":\n"
-        else:
-            act_seq = self.goal.replace(".", ":\n")
-
+        act_seq = ""
         for i, (instr, act) in enumerate(zip(self.instructions, self.actions)):
             if imax != 0 and i == imax:
                 break
@@ -38,7 +35,6 @@ class Result(object):
                 'action': act}]
             act_tok = act.replace("(", "<").replace(")", ">")
             act_seq += f"{i}.{act_tok}\n"
-        act_seq += '|'
         return subgoals, act_seq
 
     def to_json(self, condition=None, imax=0):
@@ -55,14 +51,40 @@ class Result(object):
         if self.actions is not None:
             task['subgoals'], act_seq = self.gen_action_sequence(imax=imax)
             if condition is not None:
-                cond_seq = condition.get_knowledge(self) + "\n"
-                task['instructions'] = cond_seq + act_seq
+                #cond_seq = condition.get_knowledge(self) + "\n"
+                target = self.target.lower()
+                cond_seq = Domain.get_room(self.scene).lower() + "<SEP>"
+                cond_seq += target + "<SEP>"
+                #cond_seq += describe_graph(condition)
+                #cond_seq += task['subgoals'][0]['instruction']
+                cond_seq += describe_graph_st(condition, 'floor', target)
+                task['instructions'] = self.goal + "<SEP>" + cond_seq + "<BOS>" + act_seq + "<EOS>"
             else:
                 task['instructions'] = act_seq
         else:
             task['subgoals'] = self.instructions
 
         return task
+
+
+    def to_txt(self, condition=None, imax=0):
+        res = ""
+        if self.actions is not None:
+            _, act_seq = self.gen_action_sequence(imax=imax)
+            if condition is not None:
+                #cond_seq = condition.get_knowledge(self) + "\n"
+                target = self.target.lower()
+                cond_seq = Domain.get_room(self.scene).lower() + "<SEP>"
+                cond_seq += target + "<SEP>"
+                #cond_seq += describe_graph(condition)
+                #cond_seq += describe_graph(condition, 'agent', target)
+                cond_seq += describe_graph(condition, 'floor', target)
+                #cond_seq += describe_graph(condition, 'floor', 'agent')
+                res = self.goal + "<SEP>" + cond_seq + "<BOS>" + act_seq + "<EOS>"
+            else:
+                res = act_seq
+
+        return res
 
 
 def parse_file(file_):
@@ -135,7 +157,7 @@ class Domain(object):
             #    with open(filename) as f:
             #        floor_recepts[i] = json.load(f)
 
-    def get_knowledge(self, res, only_parent=True):  # TODO: make only_parent config?
+    def get_knowledge(self, res):
         # source (room) and target (object) can later be infered from image and goal or so
         source = Domain.get_room(res.scene)
         target = res.target
@@ -148,10 +170,8 @@ class Domain(object):
         #print("3. Remaining nodes after scene specific pruning:", nodes)
         nodes = ",".join(nodes)
 
-        if only_parent:
-            nodes = res.parent if res.parent else 'none'
-
         res = f"{source}-{target}=[{nodes}]".lower()
+
         #print("3. Result:", res)
         return res
 
@@ -161,8 +181,10 @@ if __name__ == "__main__":
     parser.add_argument("dataset_path")
     parser.add_argument("outfile")
     parser.add_argument("--split_task", action='store_true')
+    parser.add_argument("--txt", action='store_true')
     parser.add_argument("--cond", help="path to graph")
     parser.add_argument("--floor_plans", help="plans for conditioning")
+    parser.add_argument("--kg", help="path to knowledge data")
     #parser.add_argument("--aug", type=int, help="no. of augmentation steps", default=0)
     args = parser.parse_args()
     print(args)
@@ -175,14 +197,30 @@ if __name__ == "__main__":
 
     dpath = osp.join(args.dataset_path, "*/*/traj_data.json")
 
+    KG = None
+    if args.kg:
+        df = pd.read_csv(args.kg)
+        KG = create_knowledge_G(df)
+
     tasks = {}
     for path in glob(dpath):
+        G = None
+        path_graph = osp.join(osp.dirname(path), "graphs/000000000.json")
+        if osp.isfile(path_graph):
+            with open(path_graph) as f:
+                #G = create_scene_G(json.load(f), KG=KG)
+                G = create_scene_G_floor(json.load(f), KG=KG)
+
         with open(path) as f:
             for res in parse_file(f):
                 #for aug in range(len(res)):
                 if res.task not in tasks:
                     tasks[res.task] = []
-                tasks[res.task] += [res.to_json(condition=domain)]
+
+                if args.txt:
+                    tasks[res.task] += [res.to_txt(condition=G)]
+                else:
+                    tasks[res.task] += [res.to_json(condition=G)]
 
     if args.split_task:
         for t in tasks:
