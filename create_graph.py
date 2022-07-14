@@ -48,14 +48,17 @@ def metrics(pos, pos_ref):
     return {'dist': r, 'pitch': pitch, 'yaw': yaw}
 
 
-def create_scene_G_floor(data, KG=None):
+def create_scene_G_floor(data, KG=None, full_names=False):
     G = nx.Graph()
 
     pos_ref = np.array([0.0, 1.0, 0.0])
     G.add_node('floor', x=pos_ref[0], y=pos_ref[1], z=pos_ref[2])
 
     for entry in data:
-        ent = entry['id'].split('|')[0].lower()
+        if not full_names:
+            ent = entry['id'].split('|')[0].lower()
+        else:
+            ent = entry['id'].lower()
         pos = np.array([
             entry['position']['x'],
             entry['position']['y'],

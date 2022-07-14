@@ -10,8 +10,8 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer, GPT2
 from transformers import get_scheduler
 from tensorboardX import SummaryWriter
 
-from trl.gpt2 import GPT2HeadWithValueModel, respond_to_batch
-from trl.ppo import PPOTrainer
+#from trl.gpt2 import GPT2HeadWithValueModel, respond_to_batch
+#from trl.ppo import PPOTrainer
 
 from evaluator import Eval
 
@@ -48,6 +48,7 @@ if __name__ == "__main__":
     parser.add_argument('--gen', help='specify test dataset json')
     parser.add_argument('--chkpt_path', help='model to load', default="checkpoints/model.pt")
     parser.add_argument('--model_path', help='save path for model', default="checkpoints/model.pt")
+    parser.add_argument('--batch_size', default=1, type=int)
     parser.add_argument('--prompt')
     args = parser.parse_args()
 
@@ -68,7 +69,6 @@ if __name__ == "__main__":
     #tokenizer.eos_token = '<EOS>'
     tokenizer.pad_token = tokenizer.eos_token
     print(tokenizer.vocab_size)
-    print(tokenizer.tokenize("cil:lightswitch cjl:garbagecan<BOS>0.GotoLocation<countertop>\n1.PickupObject<butterknife>\n2.GotoLocation<apple>\n"))
 
     if args.train:
         def tokenize(e):
@@ -84,7 +84,7 @@ if __name__ == "__main__":
         #ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'attention_mask_aux', 'labels'])
         ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
 
-        dl = DataLoader(ds, shuffle=True, batch_size=2)
+        dl = DataLoader(ds, shuffle=True, batch_size=args.batch_size)
         num_training_steps = args.train_epochs * len(dl)
 
         model.to(device)
@@ -195,8 +195,10 @@ if __name__ == "__main__":
             #    instr += ":"
             #instr = e['instructions'].split("<BOS>")[0] + "<BOS>"
             
-            # starting with second step
-            instr = e['instructions'].split("1.")[0] + "1."
+            # starting with first step
+            instr = e['instructions'].split("0.")[0] + "0."
+            ## starting with second step
+            #instr = e['instructions'].split("1.")[0] + "1."
 
             #####
             #context, goal = instr.split('\n')
@@ -233,10 +235,10 @@ if __name__ == "__main__":
             if args.eval_topk:
                 outputs = model.generate(batch['input_ids'].to(device), do_sample=True, top_k=10, top_p=0.92, num_return_sequences=3, max_length=200)
             else:
-                outputs = model.generate(batch['input_ids'].to(device), do_sample=True, max_length=200)
+                outputs = model.generate(batch['input_ids'].to(device), do_sample=True, max_length=600)
 
             label_text = tokenizer.batch_decode(batch['labels'], skip_special_tokens=True)
-            preds_text = tokenizer.batch_decode(outputs, skip_special_tokens=False)
+            preds_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
             labels = batch['labels'].squeeze()
             label_text = label_text[0]
@@ -287,8 +289,11 @@ if __name__ == "__main__":
             progress.update(1)
         outfile.close()
     else:
-        model.load_state_dict(torch.load(args.chkpt_path))
+        if os.path.isfile(args.chkpt_path):
+            model.load_state_dict(torch.load(args.chkpt_path))
         model.eval()
+
+        print(tokenizer.tokenize(args.prompt))
 
         input_ids = tokenizer(args.prompt, return_tensors="pt").input_ids
 

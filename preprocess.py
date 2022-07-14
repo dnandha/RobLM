@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import argparse
 import json
@@ -26,7 +27,7 @@ class Result(object):
     def gen_action_sequence(self, imax=0):
         subgoals = []
 
-        act_seq = ""
+        act_seq = []
         for i, (instr, act) in enumerate(zip(self.instructions, self.actions)):
             if imax != 0 and i == imax:
                 break
@@ -34,10 +35,11 @@ class Result(object):
                 'instruction': instr,
                 'action': act}]
             act_tok = act.replace("(", "<").replace(")", ">")
-            act_seq += f"{i}.{act_tok}\n"
+            act_seq += [act_tok]
+        act_seq = ",".join(act_seq)
         return subgoals, act_seq
 
-    def to_json(self, condition=None, imax=0):
+    def to_json(self, G=None, relations=None, imax=0, septoken="\\"):
         task = {
             'goal': self.goal,
             'type': self.task,
@@ -50,44 +52,66 @@ class Result(object):
 
         if self.actions is not None:
             task['subgoals'], act_seq = self.gen_action_sequence(imax=imax)
-            if condition is not None:
-                #cond_seq = condition.get_knowledge(self) + "\n"
-                target = self.target.lower()
-                cond_seq = Domain.get_room(self.scene).lower() + "<SEP>"
-                cond_seq += target + "<SEP>"
-                #cond_seq += describe_graph(condition)
+            if G is not None:
+                #cond_seq = G.get_knowledge(self) + "\n"
+                goal = "GOAL(" + self.goal + ")" + septoken
+                target = "TRGT(" + self.target.lower() + ")" + septoken
+                cond_seq = "LOC(" + Domain.get_room(self.scene).lower() + ")" + septoken
+                cond_seq += target
+                #cond_seq += describe_graph(G)
                 #cond_seq += task['subgoals'][0]['instruction']
-                cond_seq += describe_graph_st(condition, 'floor', target)
-                task['instructions'] = self.goal + "<SEP>" + cond_seq + "<BOS>" + act_seq + "<EOS>"
+                #cond_seq += describe_graph_st(G, 'floor', target)
+                descr = []
+                for edge in G.edges:
+                    if edge[-1] == 'agent':
+                        continue
+                    descr += [describe_graph_st(G, *edge)[0]]
+                cond_seq += "EXST(" + ",".join(descr) + ")" + septoken
+                rels = []
+                for rel in relations:
+                    desc = []
+                    for n in rel:
+                        name = n.split('_')[0].lower()
+                        pos = n.split('_')[1].split(',')
+                        pos = np.array([float(pos[0])/4, float(pos[4])/4, float(pos[2])/4], dtype=float)
+                        id_ = find_node(G, pos, name)
+                        desc += [describe_graph_st(G, 'floor', id_)[0]]
+                    rels += ["IN(" + ",".join(desc) + ")"]
+                cond_seq += "REL(" + ",".join(rels) + ")" + septoken
+                act_seq = "ACTS(" + act_seq + ")"
+                task['instructions'] = goal + cond_seq + act_seq
             else:
                 task['instructions'] = act_seq
         else:
             task['subgoals'] = self.instructions
 
+        #print(task)
         return task
 
 
-    def to_txt(self, condition=None, imax=0):
-        res = ""
-        if self.actions is not None:
-            _, act_seq = self.gen_action_sequence(imax=imax)
-            if condition is not None:
-                #cond_seq = condition.get_knowledge(self) + "\n"
-                target = self.target.lower()
-                cond_seq = Domain.get_room(self.scene).lower() + "<SEP>"
-                cond_seq += target + "<SEP>"
-                #cond_seq += describe_graph(condition)
-                #cond_seq += describe_graph(condition, 'agent', target)
-                cond_seq += describe_graph(condition, 'floor', target)
-                #cond_seq += describe_graph(condition, 'floor', 'agent')
-                res = self.goal + "<SEP>" + cond_seq + "<BOS>" + act_seq + "<EOS>"
-            else:
-                res = act_seq
+def find_node(G, pos_ref, name_ref):
+    id_ = None
+    last_dist = np.inf
+    for node in G.nodes:
+        name = node.split("|")
+        if len(name) == 5:
+            name = name[-1]
+        elif len(name) == 4:
+            name = name[0]
+        else:
+            continue
 
-        return res
+        if name != name_ref:
+            continue
+        pos = np.array(node.split("|")[1:4], dtype=float)
+        dist = np.linalg.norm(pos_ref - pos)
+        if dist < last_dist:
+            id_ = node
+            last_dist = dist
+    return id_
 
 
-def parse_file(file_):
+def parse_file(file_, G=None):
     data = json.load(file_)
 
     plan = None
@@ -101,18 +125,58 @@ def parse_file(file_):
         ttype = data['task_type']
 
     scene = data['scene']['scene_num']
+    objects = data['scene']['object_poses']
     target = data['pddl_params']['object_target']
     parent = data['pddl_params']['parent_target']
+
+    #if G is not None:
+    #    print(G.nodes)
 
     acts = None
     if plan:
         acts = []
+
         for p in plan:
             act = p['discrete_action']
-            action = "{}({})".format(act['action'], ",".join(act['args']))
-            if action != "NoOp()":
-                #print(action)
-                acts += [action]
+            if act['action'] == "NoOp":
+                continue
+
+            act_p = p['planner_action']
+            #print(act)
+            #print(act_p)
+
+            id_ = None
+            recep_id = None
+            if 'objectId' in act_p:
+                id_ = act_p['objectId'].lower()
+                if G is not None:
+                    s = id_.split("|")
+                    name = s[0]
+                    pos_ref = np.array([float(s[1]), float(s[2]), float(s[3])])
+                    id_ = find_node(G, pos_ref, name)
+                if 'receptacleObjectId' in act_p:
+                    recep_id = act_p['receptacleObjectId'].lower()
+            elif 'location' in act_p:
+                if G is not None:
+                    agent = G.nodes['agent']
+                    loc = act_p['location']
+                    loc = loc.split('|')[1:]
+                    pos_ref = np.array([int(loc[0]) / 4, agent['y'], int(loc[1]) / 4])
+                    id_ = find_node(G, pos_ref, act['args'][0])
+            else:
+                raise Exception(act_p)
+
+            args = []
+            if id_ is not None:
+                args += [describe_graph_st(G, 'floor', id_)[0]]
+                if recep_id is not None:
+                    args += [describe_graph_st(G, 'floor', recep_id)[0]]
+            else:
+                args = act['args']
+
+            action = "{}({})".format(act['action'], ",".join(args))
+            #print(action)
+            acts += [action]
     #for act in acts:
     #    print(act['api_action'])
     for ann in anns:
@@ -209,18 +273,30 @@ if __name__ == "__main__":
         if osp.isfile(path_graph):
             with open(path_graph) as f:
                 #G = create_scene_G(json.load(f), KG=KG)
-                G = create_scene_G_floor(json.load(f), KG=KG)
+                G = create_scene_G_floor(json.load(f), KG=KG, full_names=True)
+        else:  #TODO
+            continue
+
+        relations = []
+        pddl_path = osp.join(osp.dirname(path), "problem_0.pddl")
+        if osp.isfile(pddl_path):
+            with open(pddl_path) as f:
+                for line in f:
+                    if line.strip().startswith("(inReceptacle"):
+                        s = line.strip()[1:-1].replace("_minus_", "-").replace("_plus_", "+").replace("_dot_", ".").replace("_comma_", ",").split(" ")
+                        if not s[-1].startswith("?"):
+                            relations += [s[1:]]
 
         with open(path) as f:
-            for res in parse_file(f):
+            for res in parse_file(f, G):
                 #for aug in range(len(res)):
                 if res.task not in tasks:
                     tasks[res.task] = []
 
                 if args.txt:
-                    tasks[res.task] += [res.to_txt(condition=G)]
+                    pass
                 else:
-                    tasks[res.task] += [res.to_json(condition=G)]
+                    tasks[res.task] += [res.to_json(G=G, relations=relations)]
 
     if args.split_task:
         for t in tasks:
