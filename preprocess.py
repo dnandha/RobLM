@@ -10,7 +10,8 @@ from describe_graph import read_graph, describe_graph, describe_graph_st
 
 
 class Result(object):
-    def __init__(self, goal, task, scene, target, parent, instructions, actions):
+    def __init__(self, path, goal, task, scene, target, parent, instructions, actions, planner_actions):
+        self.path = path
         self.goal = goal.strip()
         self.task = task.strip()
         self.scene = int(scene)
@@ -18,6 +19,7 @@ class Result(object):
         self.parent = parent
         self.instructions = [i.strip() for i in instructions]
         self.actions = [a.strip() for a in actions]
+        self.planner_actions = [a.strip() for a in planner_actions]
 
     def __len__(self):
         if self.actions is None:
@@ -28,12 +30,14 @@ class Result(object):
         subgoals = []
 
         act_seq = []
-        for i, (instr, act) in enumerate(zip(self.instructions, self.actions)):
+        for i, (instr, act, p_act) in enumerate(zip(self.instructions, self.actions, self.planner_actions)):
             if imax != 0 and i == imax:
                 break
             subgoals += [{
                 'instruction': instr,
-                'action': act}]
+                'action': act,
+                'p_action': p_act,
+                }]
             act_tok = act.replace("(", "<").replace(")", ">")
             act_seq += [act_tok]
         act_seq = ",".join(act_seq)
@@ -41,6 +45,7 @@ class Result(object):
 
     def to_json(self, G=None, relations=None, imax=0, septoken="\\"):
         task = {
+            'path': self.path,
             'goal': self.goal,
             'type': self.task,
             'scene': self.scene,
@@ -111,7 +116,8 @@ def find_node(G, pos_ref, name_ref):
     return id_
 
 
-def parse_file(file_, G=None):
+def parse_file(path, G=None):
+    file_ = open(path)
     data = json.load(file_)
 
     plan = None
@@ -133,50 +139,63 @@ def parse_file(file_, G=None):
     #    print(G.nodes)
 
     acts = None
+    p_acts = None
     if plan:
         acts = []
+        p_acts = []
 
         for p in plan:
             act = p['discrete_action']
             if act['action'] == "NoOp":
                 continue
 
-            act_p = p['planner_action']
-            #print(act)
-            #print(act_p)
+            p_act = p['planner_action']
+            #print(p_act)
 
             id_ = None
             recep_id = None
-            if 'objectId' in act_p:
-                id_ = act_p['objectId'].lower()
+            loc = None
+            if 'objectId' in p_act:
+                id_ = p_act['objectId'].lower()
                 if G is not None:
                     s = id_.split("|")
                     name = s[0]
                     pos_ref = np.array([float(s[1]), float(s[2]), float(s[3])])
                     id_ = find_node(G, pos_ref, name)
-                if 'receptacleObjectId' in act_p:
-                    recep_id = act_p['receptacleObjectId'].lower()
-            elif 'location' in act_p:
+                if 'receptacleObjectId' in p_act:
+                    recep_id = p_act['receptacleObjectId'].lower()
+            elif 'location' in p_act:
                 if G is not None:
                     agent = G.nodes['agent']
-                    loc = act_p['location']
-                    loc = loc.split('|')[1:]
-                    pos_ref = np.array([int(loc[0]) / 4, agent['y'], int(loc[1]) / 4])
+                    loc = p_act['location']
+                    l = loc.split('|')[1:]
+                    pos_ref = np.array([int(l[0]) / 4, agent['y'], int(l[1]) / 4])
                     id_ = find_node(G, pos_ref, act['args'][0])
             else:
-                raise Exception(act_p)
+                raise Exception(p_act)
 
             args = []
+            p_args = []
             if id_ is not None:
                 args += [describe_graph_st(G, 'floor', id_)[0]]
+                p_args += [id_]
                 if recep_id is not None:
                     args += [describe_graph_st(G, 'floor', recep_id)[0]]
+                    p_args += [recep_id]
+
+                if loc is not None:
+                    p_args = [loc]
             else:
                 args = act['args']
 
             action = "{}({})".format(act['action'], ",".join(args))
             #print(action)
             acts += [action]
+
+            p_action = "{}({})".format(p_act['action'], ",".join(p_args))
+            #print(p_action)
+            p_acts += [p_action]
+
     #for act in acts:
     #    print(act['api_action'])
     for ann in anns:
@@ -188,7 +207,8 @@ def parse_file(file_, G=None):
 
         #for act, instr in zip(acts, instrs):
             #print(act, instr)
-        yield Result(goal, ttype, scene, target, parent, instrs, acts)
+        yield Result(path, goal, ttype, scene, target, parent, instrs, acts, p_acts)
+    file_.close()
 
 
 class Domain(object):
@@ -287,16 +307,15 @@ if __name__ == "__main__":
                         if not s[-1].startswith("?"):
                             relations += [s[1:]]
 
-        with open(path) as f:
-            for res in parse_file(f, G):
-                #for aug in range(len(res)):
-                if res.task not in tasks:
-                    tasks[res.task] = []
+        for res in parse_file(path, G):
+            #for aug in range(len(res)):
+            if res.task not in tasks:
+                tasks[res.task] = []
 
-                if args.txt:
-                    pass
-                else:
-                    tasks[res.task] += [res.to_json(G=G, relations=relations)]
+            if args.txt:
+                pass
+            else:
+                tasks[res.task] += [res.to_json(G=G, relations=relations)]
 
     if args.split_task:
         for t in tasks:

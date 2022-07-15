@@ -190,24 +190,9 @@ if __name__ == "__main__":
             torch.save(model.state_dict(), args.model_path)
     elif args.eval:
         def tokenize(e):
-            #instr = e['goal'].replace(".",":")
-            #if not instr.endswith(":"):
-            #    instr += ":"
-            #instr = e['instructions'].split("<BOS>")[0] + "<BOS>"
-            
-            # starting with first step
-            instr = e['instructions'].split("0.")[0] + "0."
-            ## starting with second step
-            #instr = e['instructions'].split("1.")[0] + "1."
+            instr = e['instructions'].split("ACTS(")[0] + "ACTS("
 
-            #####
-            #context, goal = instr.split('\n')
-            #context = context.split('-')
-            #context[1] = context[1].split('=')[0]
-            #arg = ','.join(list(Eval.proc_instructions(e['instructions']))[0]['args'])
-            #instr = f"{context[0]}-{context[1]}=[{arg}]\n{goal}"
-            #####
-            f = tokenizer(instr)  # TODO
+            f = tokenizer(instr)
             f['labels'] = tokenizer(e['instructions'])['input_ids']
             return f
 
@@ -231,22 +216,22 @@ if __name__ == "__main__":
         progress = tqdm(range(len(dl)))
         for batch in dl:
             #batch = {k: v.to(device) for k, v in batch.items()}
+            batch['input_ids'] = batch['input_ids'][:1024]
 
             if args.eval_topk:
                 outputs = model.generate(batch['input_ids'].to(device), do_sample=True, top_k=10, top_p=0.92, num_return_sequences=3, max_length=200)
             else:
-                outputs = model.generate(batch['input_ids'].to(device), do_sample=True, max_length=600)
+                outputs = model.generate(batch['input_ids'].to(device), do_sample=True, max_length=1024)
 
             label_text = tokenizer.batch_decode(batch['labels'], skip_special_tokens=True)
-            preds_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            preds_text = tokenizer.batch_decode(outputs, skip_special_tokens=False)
 
             labels = batch['labels'].squeeze()
             label_text = label_text[0]
-            label_text = "0." + label_text.split("0.")[1]
-            #label_text = label_text.split("<EOS")[0].split("<BOS>")[1]
+            label_text = label_text.split("ACTS(")[1].split(")")[0]
 
             for i, (pred, pred_text) in enumerate(zip(outputs, preds_text)):
-                pred_text = "0." + pred_text.split("0.")[1]
+                pred_text = pred_text.split("ACTS(")[1].split(")")[0]
                 print("LBL:", label_text)
                 print("PRD:", pred_text)
                 ev.eval(i, Eval.proc_instructions(label_text), Eval.proc_instructions(pred_text))
