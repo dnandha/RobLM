@@ -1,19 +1,22 @@
 import os
 import torch
 import pandas as pd
+import torch.nn.functional as F
 from datasets import Dataset
 from datasets import load_metric
 from torch.utils.data import DataLoader
 from torch.optim import AdamW
+from torch.distributions import Categorical
 from tqdm.auto import tqdm
 from transformers import AutoModelForSequenceClassification, AutoTokenizer, GPT2LMHeadModel, AutoTokenizer
 from transformers import get_scheduler
 from tensorboardX import SummaryWriter
 
-from trl.gpt2 import GPT2HeadWithValueModel, respond_to_batch
-from trl.ppo import PPOTrainer
+#from trl.gpt2 import GPT2HeadWithValueModel, respond_to_batch
+#from trl.ppo import PPOTrainer
 
 from evaluator import Eval
+from env import OfflineEnv
 
 
 def train_tokenizer(tok, df, size=10000):
@@ -41,7 +44,8 @@ if __name__ == "__main__":
     parser.add_argument('--train_tok', help='tune tokenizer')
     parser.add_argument('--tokdir', help='tokenizer dir', default="")
     parser.add_argument('--train_rl', help='tune model in RL setting')
-    parser.add_argument('--train_epochs', type=int, default=2)
+    parser.add_argument('--train_epochs', help='total epochs to train', type=int, default=2)
+    parser.add_argument('--warmstart', help='pre-train LM model without RL', type=int, default=1000)
     parser.add_argument('--log', help='logfile for tensorboard')
     parser.add_argument('--eval', help='specify valid dataset json')
     parser.add_argument('--eval_topk', type=int, help='use topk sampling')
@@ -49,9 +53,13 @@ if __name__ == "__main__":
     parser.add_argument('--chkpt_path', help='model to load', default="checkpoints/model.pt")
     parser.add_argument('--model_path', help='save path for model', default="checkpoints/model.pt")
     parser.add_argument('--prompt')
+    parser.add_argument('--cpu', action='store_true')
     args = parser.parse_args()
 
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    if args.cpu:
+        device = torch.device("cpu")
+    else:
+        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     model = GPT2LMHeadModel.from_pretrained('gpt2')
     named_layers = dict(model.named_modules())
@@ -67,24 +75,23 @@ if __name__ == "__main__":
     #tokenizer.bos_token = '<BOS>'
     #tokenizer.eos_token = '<EOS>'
     tokenizer.pad_token = tokenizer.eos_token
-    print(tokenizer.vocab_size)
-    print(tokenizer.tokenize("cil:lightswitch cjl:garbagecan<BOS>0.GotoLocation<countertop>\n1.PickupObject<butterknife>\n2.GotoLocation<apple>\n"))
+    #print(tokenizer.vocab_size)
+    #print(tokenizer.tokenize("cil:lightswitch cjl:garbagecan<BOS>0.GotoLocation<countertop>\n1.PickupObject<butterknife>\n2.GotoLocation<apple>\n"))
 
     if args.train:
         def tokenize(e):
-            #e = tokenizer(e['goal'], truncation=True, padding='max_length')#, return_tensors='pt')
-            f = tokenizer(e['instructions'], truncation=True, padding='max_length')#, return_tensors='pt')
-            #f['attention_mask_aux'] = create_aux_mask(f['input_ids'])
-            f['labels'] = f['input_ids']
+            s = e['instructions'].split('<BOS>')
+            f = tokenizer(s[0])  # , truncation=True, padding='max_length')
+            f['labels'] = tokenizer('<BOS>' + s[1])['input_ids']
             return f
 
         df = pd.read_json(args.train)
         ds = Dataset.from_pandas(df)
-        ds = ds.map(tokenize, num_proc=8)
+        ds = ds.map(tokenize, num_proc=1)
         #ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'attention_mask_aux', 'labels'])
         ds.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels'])
 
-        dl = DataLoader(ds, shuffle=True, batch_size=2)
+        dl = DataLoader(ds, shuffle=True, batch_size=1)
         num_training_steps = args.train_epochs * len(dl)
 
         model.to(device)
@@ -98,37 +105,92 @@ if __name__ == "__main__":
             name="linear", optimizer=optimizer, num_warmup_steps=0, num_training_steps=num_training_steps
         )
 
+        env = OfflineEnv()
+
         progress = tqdm(range(num_training_steps))
         writer = SummaryWriter(args.log)
         for epoch in range(args.train_epochs):
             for batch in dl:
                 batch = {k: v.to(device) for k, v in batch.items()}
-                outputs_lm = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch['labels'])
+                inputs = batch['input_ids']
+                att_mask = batch['attention_mask']
+                labels = batch['labels']
 
-                # simply modify the attention mask such that it focuses on the arguments -> most important for successful plan
-                #outputs_aux = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask_aux'], labels=batch['labels'])
+                losses = []
 
-                loss = outputs_lm.loss # + outputs_aux.loss
+                # 0. train LM normally
+                # (inputs == labels for LM)
+                outputs_lm = model(input_ids=inputs, attention_mask=att_mask, labels=inputs)
+                loss = outputs_lm.loss
+                losses += [loss]
+                writer.add_scalar(f'train/lm_loss', loss.item(), progress.n)
 
-                #import pdb; pdb.set_trace()
-                #preds = torch.argmax(outputs.logits, dim=-1)
-                #res = tokenizer.batch_decode(preds, skip_special_tokens=True)[0]
+                # REINFORCE
+                if progress.n > args.warmstart:
+                    # 1. collect trajectory
+                    env.reset(labels)
+                    S, A, R = [], [], []
 
-                #if args.auxloss:
-                #    outputs = model.generate(batch['input_ids'], do_sample=False, max_length=200)
-                #    labels_text = tokenizer.batch_decode(batch['labels'], skip_special_tokens=True)
-                #    preds_text = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+                    # instead of state -> next_state we follow expert trajectory
+                    # 1. BOS --> ??
+                    # 2. BOS GotoLocation -> ??
+                    # 3. BOS GotoLocation countertop --> ??
+                    # t. BOS GotoLocation countertop ... EOS
+                    for i in range(labels.shape[1]):
+                        state = torch.cat((inputs, labels[:, :i+1]), dim=1)
+                        att_mask = torch.ones_like(state)
 
-                #    for label, pred in zip(labels_text, preds_text):
-                #        aux_loss(proc_instructions(label), proc_instructions(pred))
+                        with torch.no_grad():
+                            outputs_lm = model(input_ids=state, attention_mask=att_mask, labels=state)
 
+                        # instead of argmax we do softmax
+                        next_token_probs = F.softmax(outputs_lm.logits[:, -1, :], dim=1)  # dim := [bs, vocab_size]
+                        action_probs = next_token_probs
+                        # torch equivalent of np.random.choice(x, p)
+                        action = Categorical(action_probs).sample()
+
+                        # this doesn't give next state, because we follow expert stateectory
+                        done, reward = env.step(action)
+
+                        S += [state]
+                        A += [action]
+                        R += [reward]
+
+                        if done:
+                            writer.add_scalar(f'train/eps_len', i, progress.n)
+                            break
+
+                    # 2. sum discounted future rewards
+                    gamma = 0.99
+                    G = torch.tensor([gamma**t * R[t] for t in range(len(R))])
+                    G = G.cumsum(0).flip(0)
+
+                    # 3. rerun policy with optimization
+                    L = []
+                    for s, a, g in zip(S, A, G):
+                        outputs_lm = model(input_ids=s, attention_mask=torch.ones_like(s), labels=s)
+
+                        # pick previously chosen action from logits
+                        log_prob = outputs_lm.logits[:, -1, a]
+                        # and multiply with expected return
+                        L += [-torch.mean(log_prob * g)]
+
+                    # mean loss
+                    loss = sum(L) / len(L)
+                    writer.add_scalar('train/policy_loss', loss.item(), progress.n)
+                    losses += [loss]
+
+                # LM loss + policy loss
+                loss = sum(losses)
                 loss.backward()
-                writer.add_scalar('loss/train', loss.item(), progress.n)
 
                 optimizer.step()
                 lr_scheduler.step()
                 optimizer.zero_grad()
                 progress.update(1)
+
+                if progress.n % 5000 == 0:
+                    torch.save(model.state_dict(), args.model_path)
 
             torch.save(model.state_dict(), args.model_path)
     elif args.train_tok:
@@ -286,11 +348,14 @@ if __name__ == "__main__":
             outfile.write(res)
             progress.update(1)
         outfile.close()
-    else:
-        model.load_state_dict(torch.load(args.chkpt_path))
-        model.eval()
+    elif args.prompt:
+        if os.path.isfile(args.chkpt_path):
+            model.load_state_dict(torch.load(args.chkpt_path))
+            model.eval()
 
+        print(tokenizer.tokenize(args.prompt))
         input_ids = tokenizer(args.prompt, return_tensors="pt").input_ids
+        print(input_ids)
 
         outputs = model.generate(input_ids, do_sample=False, max_length=128)
         print(tokenizer.batch_decode(outputs, skip_special_tokens=True)[0])
