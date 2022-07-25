@@ -45,7 +45,7 @@ if __name__ == "__main__":
     parser.add_argument('--tokdir', help='tokenizer dir', default="")
     parser.add_argument('--train_rl', help='tune model in RL setting')
     parser.add_argument('--train_epochs', help='total epochs to train', type=int, default=2)
-    parser.add_argument('--warmstart', help='pre-train LM model without RL', type=int, default=1000)
+    parser.add_argument('--warmstart', help='pre-train LM model without RL', type=int, default=0)
     parser.add_argument('--log', help='logfile for tensorboard')
     parser.add_argument('--eval', help='specify valid dataset json')
     parser.add_argument('--eval_topk', type=int, help='use topk sampling')
@@ -120,13 +120,16 @@ if __name__ == "__main__":
 
                 # 0. train LM normally
                 # (inputs == labels for LM)
-                outputs_lm = model(input_ids=inputs, attention_mask=att_mask, labels=inputs)
-                loss = outputs_lm.loss
-                losses += [loss]
-                writer.add_scalar(f'train/lm_loss', loss.item(), progress.n)
+                #in_ = inputs
+                #in_ = torch.cat((inputs, labels), dim=1)
+                #att_mask = torch.ones_like(in_)
+                #outputs_lm = model(input_ids=in_, attention_mask=att_mask, labels=in_)
+                #loss = outputs_lm.loss
+                #losses += [loss]
+                #writer.add_scalar(f'train/lm_loss', loss.item(), progress.n)
 
                 # REINFORCE
-                if progress.n > args.warmstart:
+                if progress.n >= args.warmstart:
                     # 1. collect trajectory
                     env.reset(labels)
                     S, A, R = [], [], []
@@ -156,29 +159,37 @@ if __name__ == "__main__":
                         A += [action]
                         R += [reward]
 
-                        if done:
-                            writer.add_scalar(f'train/eps_len', i, progress.n)
-                            break
+                        #if done:
+                        #    writer.add_scalar(f'train/eps_len', i, progress.n)
+                        #    break
 
                     # 2. sum discounted future rewards
-                    gamma = 0.99
-                    G = torch.tensor([gamma**t * R[t] for t in range(len(R))])
-                    G = G.cumsum(0).flip(0)
+                    #gamma = 0.99
+                    #G = torch.tensor([gamma**t * R[t] for t in range(len(R))])
+                    #G = G.cumsum(0).flip(0)
+                    #import pdb; pdb.set_trace()
+                    G = torch.tensor(R).cumsum(0).flip(0)
 
                     # 3. rerun policy with optimization
-                    L = []
-                    for s, a, g in zip(S, A, G):
+                    L1 = torch.zeros_like(G, dtype=float)
+                    L2 = torch.zeros_like(G, dtype=float)
+                    for i, (s, a, g) in enumerate(zip(S, A, G)):
                         outputs_lm = model(input_ids=s, attention_mask=torch.ones_like(s), labels=s)
+                        loss = outputs_lm.loss
+                        L1[i] = loss
 
                         # pick previously chosen action from logits
                         log_prob = outputs_lm.logits[:, -1, a]
                         # and multiply with expected return
-                        L += [-torch.mean(log_prob * g)]
+                        L2[i] = -torch.mean(log_prob * g)
 
-                    # mean loss
-                    loss = sum(L) / len(L)
-                    writer.add_scalar('train/policy_loss', loss.item(), progress.n)
-                    losses += [loss]
+                    # mean losses
+                    L1 = L1.mean()
+                    L2 = L2.mean()
+                    losses += [L1]
+                    losses += [L2]
+                    writer.add_scalar('train/lm_loss', L1.item(), progress.n)
+                    writer.add_scalar('train/policy_loss', L2.item(), progress.n)
 
                 # LM loss + policy loss
                 loss = sum(losses)

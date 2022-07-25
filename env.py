@@ -4,24 +4,23 @@ import torch
 class OfflineEnv(object):
     def __init__(self):
         self.i = 0
-        self.state = True  # binary state
+        self.done = False
+        self.reward = None
 
     def reset(self, labels):
         self.i = 0
+        self.done = False
         self.labels = labels
-        self.state = True
+        self.reward = torch.zeros_like(labels)
 
-        return self.state
-
-    def step(self, action):
-        reward = torch.zeros_like(action)
-        if self.state:
-            for j in range(reward.shape[0]):
+    def step(self, action, R=1, gamma=0.99):
+        if not self.done:
+            for j in range(self.reward.shape[0]):
                 if action[j] == self.labels[j, self.i]:
-                    reward[j] = 1
-        else:
-            self.state = False
+                    self.reward[j] = gamma**self.i * R
 
+        reward = torch.sum(self.reward, dim=1)
+        self.done = reward == 0
         self.i += 1
 
-        return self.state, reward
+        return self.done, reward
