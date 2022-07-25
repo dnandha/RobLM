@@ -53,6 +53,7 @@ if __name__ == "__main__":
     parser.add_argument('--chkpt_path', help='model to load', default="checkpoints/model.pt")
     parser.add_argument('--model_path', help='save path for model', default="checkpoints/model.pt")
     parser.add_argument('--prompt')
+    parser.add_argument('--forward')
     parser.add_argument('--cpu', action='store_true')
     args = parser.parse_args()
 
@@ -140,9 +141,11 @@ if __name__ == "__main__":
                     # 3. BOS GotoLocation countertop --> ??
                     # t. BOS GotoLocation countertop ... EOS
                     for i in range(labels.shape[1]):
+                        # new state: old state + next expert action
                         state = torch.cat((inputs, labels[:, :i+1]), dim=1)
                         att_mask = torch.ones_like(state)
 
+                        # run inference only
                         with torch.no_grad():
                             outputs_lm = model(input_ids=state, attention_mask=att_mask, labels=state)
 
@@ -152,31 +155,29 @@ if __name__ == "__main__":
                         # torch equivalent of np.random.choice(x, p)
                         action = Categorical(action_probs).sample()
 
-                        # this doesn't give next state, because we follow expert stateectory
+                        # this doesn't give next state, because we follow expert trajectory
                         done, reward = env.step(action)
 
                         S += [state]
                         A += [action]
                         R += [reward]
 
+                        # keep going in any case to collect more samples for LM training
                         #if done:
                         #    writer.add_scalar(f'train/eps_len', i, progress.n)
                         #    break
 
                     # 2. sum discounted future rewards
-                    #gamma = 0.99
-                    #G = torch.tensor([gamma**t * R[t] for t in range(len(R))])
-                    #G = G.cumsum(0).flip(0)
-                    #import pdb; pdb.set_trace()
                     G = torch.tensor(R).cumsum(0).flip(0)
 
                     # 3. rerun policy with optimization
                     L1 = torch.zeros_like(G, dtype=float)
                     L2 = torch.zeros_like(G, dtype=float)
+                    #if torch.sum(G) > 0:
+                    #    import pdb; pdb.set_trace()
                     for i, (s, a, g) in enumerate(zip(S, A, G)):
                         outputs_lm = model(input_ids=s, attention_mask=torch.ones_like(s), labels=s)
-                        loss = outputs_lm.loss
-                        L1[i] = loss
+                        L1[i] = outputs_lm.loss
 
                         # pick previously chosen action from logits
                         log_prob = outputs_lm.logits[:, -1, a]
@@ -370,3 +371,29 @@ if __name__ == "__main__":
 
         outputs = model.generate(input_ids, do_sample=False, max_length=128)
         print(tokenizer.batch_decode(outputs, skip_special_tokens=True)[0])
+    elif args.forward:
+        if os.path.isfile(args.chkpt_path):
+            model.load_state_dict(torch.load(args.chkpt_path))
+            model.eval()
+
+        print(tokenizer.tokenize(args.forward))
+        input_ids = tokenizer(args.forward, return_tensors="pt").input_ids
+        print(input_ids)
+
+        bos_token = 1
+        eos_token = 2
+        inputs = input_ids
+        action = 0
+        while not action == eos_token:
+            att_mask = torch.ones_like(inputs)
+
+            with torch.no_grad():
+                outputs_lm = model(input_ids=inputs, attention_mask=att_mask)
+
+            # instead of argmax we do softmax
+            next_token_probs = F.softmax(outputs_lm.logits[:, -1, :], dim=1)  # dim := [bs, vocab_size]
+            action_probs = next_token_probs
+            # torch equivalent of np.random.choice(x, p)
+            action = Categorical(action_probs).sample()
+            inputs = torch.cat((inputs, torch.tensor([[action]])), dim=1)
+            print(tokenizer.decode(action))
