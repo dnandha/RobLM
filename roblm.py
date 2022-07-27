@@ -142,15 +142,13 @@ if __name__ == "__main__":
 
                 losses = []
 
-                # 0. train LM normally
+                # 0. train full trajectory
                 # (inputs == labels for LM)
                 #in_ = inputs
-                #in_ = torch.cat((inputs, labels), dim=1)
-                #att_mask = torch.ones_like(in_)
-                #outputs_lm = model(input_ids=in_, attention_mask=att_mask, labels=in_)
-                #loss = outputs_lm.loss
-                #losses += [loss]
-                #writer.add_scalar(f'train/lm_loss', loss.item(), progress.n)
+                in_ = torch.cat((inputs, labels), dim=1)
+                att_mask = torch.ones_like(in_)
+                outputs_lm = model(input_ids=in_, attention_mask=att_mask, labels=in_)
+                L0 = outputs_lm.loss
 
                 # REINFORCE
                 if progress.n >= args.warmstart:
@@ -159,8 +157,8 @@ if __name__ == "__main__":
                     S, A, R = [], [], []
 
                     # instead of state -> next_state we follow expert trajectory
-                    # 1. ... BOS --> ??
-                    # 2. ... BOS GotoLocation -> ??
+                    # 1. ... BOS --> GotoLocation
+                    # 2. ... BOS GotoLocation -> countertop
                     # 3. ... BOS GotoLocation countertop --> ??
                     # t. ... BOS GotoLocation countertop ... EOS
                     for i in range(labels.shape[1]):
@@ -181,6 +179,10 @@ if __name__ == "__main__":
 
                         # this doesn't give next state, because we follow expert trajectory
                         done, reward = env.step(action)
+                        #print(tokenizer.batch_decode(state))
+                        #print(tokenizer.batch_decode(action))
+                        #print(tokenizer.batch_decode(labels[:, i]))
+                        #print(reward)
 
                         S += [state]
                         A += [action]
@@ -191,15 +193,21 @@ if __name__ == "__main__":
                         #    writer.add_scalar(f'train/eps_len', i, progress.n)
                         #    break
 
-                    # 2. sum discounted future rewards
+                    # 2. sum of discounted future rewards
                     R = torch.tensor(R)
-                    G = R.cumsum(0).flip(0)
+                    G = R.flip(0).cumsum(0).flip(0)
 
-                    writer.add_scalar('train/cum_reward', torch.sum(R), progress.n)
+                    # baseline, whitening transform: subtract mean and divide by stddev
+                    G -= torch.mean(G)
+                    #print(G)
+                    #G /= (torch.std(G) + 1e-10)
+
+                    writer.add_scalar('train/cum_reward_pi', torch.sum(R), progress.n)
+                    writer.add_scalar('train/running_mean_reward', env.reward_mu, progress.n)
 
                     # 3. rerun policy with optimization
-                    L1 = torch.zeros_like(G, dtype=float)
-                    L2 = torch.zeros_like(G, dtype=float)
+                    L1 = torch.zeros_like(G, dtype=float, device=device)
+                    L2 = torch.zeros_like(G, dtype=float, device=device)
                     #if torch.sum(G) > 0:
                     #    import pdb; pdb.set_trace()
                     for i, (s, a, g) in enumerate(zip(S, A, G)):
@@ -213,16 +221,15 @@ if __name__ == "__main__":
                         action_probs = F.softmax(outputs_lm.logits[:, -1, :], dim=1)
                         log_prob = Categorical(action_probs).log_prob(action)
 
-                        # and multiply with expected return
-                        L2[i] = torch.mean(log_prob * g)  # TODO: removed minus
+                        L2[i] = -torch.mean(log_prob * g)
 
                     # mean losses
-                    L1 = L1.mean()
-                    L2 = L2.mean()
-                    losses += [L1]
-                    losses += [L2]
-                    writer.add_scalar('train/lm_loss', L1.item(), progress.n)
-                    writer.add_scalar('train/policy_loss', L2.item(), progress.n)
+                    loss_lm = torch.cat((L0.unsqueeze(0), L1)).mean()
+                    loss_pi = L2.mean()
+                    losses += [loss_lm]
+                    losses += [loss_pi]
+                    writer.add_scalar('train/loss_lm', loss_lm.item(), progress.n)
+                    writer.add_scalar('train/loss_policy', loss_pi.item(), progress.n)
 
                 # LM loss + policy loss
                 loss = sum(losses)
@@ -326,6 +333,7 @@ if __name__ == "__main__":
             #    outputs = model.generate(batch['input_ids'].to(device), do_sample=True, top_k=10, top_p=0.92, num_return_sequences=3, max_length=200)
             #else:
             #    outputs = model.generate(batch['input_ids'].to(device), do_sample=True, max_length=200)
+            import pdb; pdb.set_trace()
             preds = generate(batch['input_ids'], model)
 
             #labels_text = tokenizer.batch_decode(batch['labels'], skip_special_tokens=True)

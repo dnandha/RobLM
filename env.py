@@ -22,13 +22,13 @@ class OfflineEnv(object):
             # once done, no reward is given
             if not self.done:
                 if action[j] == self.labels[j, self.i]:
-                    # subtract running mean to fight high variance
-                    reward[j] = gamma**self.i * (R - self.reward_mu)
+                    # subtract running mean to fight high variance  # TODO
+                    reward[j] = gamma**self.i * R #(R - self.reward_mu)
             else:
                 reward[j] = 0
 
         # scale reward by episode length
-        reward /= self.labels.shape[1]
+        #reward /= self.labels.shape[1]
 
         # update running mean
         if self.i_total > 0:
