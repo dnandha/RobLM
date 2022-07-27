@@ -16,7 +16,7 @@ class OfflineEnv(object):
         if self.reward_mu is None:
             self.reward_mu = torch.zeros(labels.shape[0], dtype=float, device=self.labels.get_device())
 
-    def step(self, action, R=1, gamma=1.00):
+    def step(self, action, R=1, gamma=0.99):
         reward = torch.zeros(self.labels.shape[0], dtype=float, device=self.labels.get_device())
         for j in range(reward.shape[0]):
             # once done, no reward is given

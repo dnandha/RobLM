@@ -37,6 +37,29 @@ def train_tokenizer(tok, df, size=10000):
     return tokenizer
 
 
+def generate(input_ids, model):
+    traj = []
+
+    bos_token = 1
+    eos_token = 2
+    inputs = input_ids
+    action = 0
+    while not action == eos_token:
+        att_mask = torch.ones_like(inputs)
+
+        with torch.no_grad():
+            outputs_lm = model(input_ids=inputs, attention_mask=att_mask)
+
+        # instead of argmax we do softmax
+        #action_probs == next_token_probs
+        action_probs = F.softmax(outputs_lm.logits[:, -1, :], dim=1)  # dim := [bs, vocab_size]
+
+        # torch equivalent of np.random.choice(x, p)
+        action = Categorical(action_probs).sample()
+        inputs = torch.cat((inputs, torch.tensor([[action]]).to(device)), dim=1)
+        yield action
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
@@ -82,8 +105,8 @@ if __name__ == "__main__":
     if args.train:
         def tokenize(e):
             s = e['instructions'].split('<BOS>')
-            f = tokenizer(s[0])  # , truncation=True, padding='max_length')
-            f['labels'] = tokenizer('<BOS>' + s[1])['input_ids']
+            f = tokenizer(s[0] + '<BOS>')  # , truncation=True, padding='max_length')
+            f['labels'] = tokenizer(s[1])['input_ids']
             return f
 
         df = pd.read_json(args.train)
@@ -136,13 +159,13 @@ if __name__ == "__main__":
                     S, A, R = [], [], []
 
                     # instead of state -> next_state we follow expert trajectory
-                    # 1. BOS --> ??
-                    # 2. BOS GotoLocation -> ??
-                    # 3. BOS GotoLocation countertop --> ??
-                    # t. BOS GotoLocation countertop ... EOS
+                    # 1. ... BOS --> ??
+                    # 2. ... BOS GotoLocation -> ??
+                    # 3. ... BOS GotoLocation countertop --> ??
+                    # t. ... BOS GotoLocation countertop ... EOS
                     for i in range(labels.shape[1]):
                         # new state: old state + next expert action
-                        state = torch.cat((inputs, labels[:, :i+1]), dim=1)
+                        state = torch.cat((inputs, labels[:, :i]), dim=1)
                         att_mask = torch.ones_like(state)
 
                         # run inference only
@@ -150,8 +173,9 @@ if __name__ == "__main__":
                             outputs_lm = model(input_ids=state, attention_mask=att_mask, labels=state)
 
                         # instead of argmax we do softmax
-                        next_token_probs = F.softmax(outputs_lm.logits[:, -1, :], dim=1)  # dim := [bs, vocab_size]
-                        action_probs = next_token_probs
+                        # action_probs == next_token_probs
+                        action_probs  = F.softmax(outputs_lm.logits[:, -1, :], dim=1)  # dim := [bs, vocab_size]
+
                         # torch equivalent of np.random.choice(x, p)
                         action = Categorical(action_probs).sample()
 
@@ -168,7 +192,10 @@ if __name__ == "__main__":
                         #    break
 
                     # 2. sum discounted future rewards
-                    G = torch.tensor(R).cumsum(0).flip(0)
+                    R = torch.tensor(R)
+                    G = R.cumsum(0).flip(0)
+
+                    writer.add_scalar('train/cum_reward', torch.sum(R), progress.n)
 
                     # 3. rerun policy with optimization
                     L1 = torch.zeros_like(G, dtype=float)
@@ -179,10 +206,15 @@ if __name__ == "__main__":
                         outputs_lm = model(input_ids=s, attention_mask=torch.ones_like(s), labels=s)
                         L1[i] = outputs_lm.loss
 
-                        # pick previously chosen action from logits
-                        log_prob = outputs_lm.logits[:, -1, a]
+                        ## pick previously chosen action from logits
+                        ## --> logits are shit, they need to be normalized
+                        ##log_prob = outputs_lm.logits[:, -1, a]
+                        # calculate log prob of picked action
+                        action_probs = F.softmax(outputs_lm.logits[:, -1, :], dim=1)
+                        log_prob = Categorical(action_probs).log_prob(action)
+
                         # and multiply with expected return
-                        L2[i] = -torch.mean(log_prob * g)
+                        L2[i] = torch.mean(log_prob * g)  # TODO: removed minus
 
                     # mean losses
                     L1 = L1.mean()
@@ -264,23 +296,9 @@ if __name__ == "__main__":
             torch.save(model.state_dict(), args.model_path)
     elif args.eval:
         def tokenize(e):
-            #instr = e['goal'].replace(".",":")
-            #if not instr.endswith(":"):
-            #    instr += ":"
-            #instr = e['instructions'].split("<BOS>")[0] + "<BOS>"
-            
-            # starting with second step
-            instr = e['instructions'].split("1.")[0] + "1."
-
-            #####
-            #context, goal = instr.split('\n')
-            #context = context.split('-')
-            #context[1] = context[1].split('=')[0]
-            #arg = ','.join(list(Eval.proc_instructions(e['instructions']))[0]['args'])
-            #instr = f"{context[0]}-{context[1]}=[{arg}]\n{goal}"
-            #####
-            f = tokenizer(instr)  # TODO
-            f['labels'] = tokenizer(e['instructions'])['input_ids']
+            s = e['instructions'].split('<BOS>')
+            f = tokenizer(s[0] + '<BOS>')
+            f['labels'] = tokenizer(s[1])['input_ids']
             return f
 
         model.to(device)
@@ -302,30 +320,35 @@ if __name__ == "__main__":
 
         progress = tqdm(range(len(dl)))
         for batch in dl:
-            #batch = {k: v.to(device) for k, v in batch.items()}
+            batch = {k: v.to(device) for k, v in batch.items()}
 
-            if args.eval_topk:
-                outputs = model.generate(batch['input_ids'].to(device), do_sample=True, top_k=10, top_p=0.92, num_return_sequences=3, max_length=200)
-            else:
-                outputs = model.generate(batch['input_ids'].to(device), do_sample=True, max_length=200)
+            #if args.eval_topk:
+            #    outputs = model.generate(batch['input_ids'].to(device), do_sample=True, top_k=10, top_p=0.92, num_return_sequences=3, max_length=200)
+            #else:
+            #    outputs = model.generate(batch['input_ids'].to(device), do_sample=True, max_length=200)
+            preds = generate(batch['input_ids'], model)
 
-            label_text = tokenizer.batch_decode(batch['labels'], skip_special_tokens=True)
-            preds_text = tokenizer.batch_decode(outputs, skip_special_tokens=False)
+            #labels_text = tokenizer.batch_decode(batch['labels'], skip_special_tokens=True)
+            #labels_text = labels_text[0]
+            #preds_text = tokenizer.batch_decode(preds, skip_special_tokens=True)
+            #preds_text = ''.join(preds_text)
 
+            preds = torch.tensor(list(preds), device=device)
             labels = batch['labels'].squeeze()
-            label_text = label_text[0]
-            label_text = "0." + label_text.split("0.")[1]
-            #label_text = label_text.split("<EOS")[0].split("<BOS>")[1]
+            ev.add(labels, preds)
 
-            for i, (pred, pred_text) in enumerate(zip(outputs, preds_text)):
-                pred_text = "0." + pred_text.split("0.")[1]
-                print("LBL:", label_text)
-                print("PRD:", pred_text)
-                ev.eval(i, Eval.proc_instructions(label_text), Eval.proc_instructions(pred_text))
+            #for i, (pred, pred_text) in enumerate(zip(outputs, preds_text)):
+            #    pred_text = "0." + pred_text.split("0.")[1]
+            #    print("LBL:", label_text)
+            #    print("PRD:", pred_text)
+            #    ev.eval(i, Eval.proc_instructions(label_text), Eval.proc_instructions(pred_text))
 
-                #score = metric.add_batch(predictions=pred[:len(labels)], references=labels)
-                #if progress.n % 20 == 0:
-                ev.print_stats(i)
+            #    #score = metric.add_batch(predictions=pred[:len(labels)], references=labels)
+            #    #if progress.n % 20 == 0:
+            #    ev.print_stats(i)
+
+            if progress.n % 20 == 0:
+                ev.print_stats(0)
 
             progress.update(1)
 
@@ -376,24 +399,11 @@ if __name__ == "__main__":
             model.load_state_dict(torch.load(args.chkpt_path))
             model.eval()
 
-        print(tokenizer.tokenize(args.forward))
-        input_ids = tokenizer(args.forward, return_tensors="pt").input_ids
+        print(tokenizer.tokenize(inputs))
+        input_ids = tokenizer(inputs, return_tensors="pt").input_ids
         print(input_ids)
 
-        bos_token = 1
-        eos_token = 2
-        inputs = input_ids
-        action = 0
-        while not action == eos_token:
-            att_mask = torch.ones_like(inputs)
-
-            with torch.no_grad():
-                outputs_lm = model(input_ids=inputs, attention_mask=att_mask)
-
-            # instead of argmax we do softmax
-            next_token_probs = F.softmax(outputs_lm.logits[:, -1, :], dim=1)  # dim := [bs, vocab_size]
-            action_probs = next_token_probs
-            # torch equivalent of np.random.choice(x, p)
-            action = Categorical(action_probs).sample()
-            inputs = torch.cat((inputs, torch.tensor([[action]])), dim=1)
-            print(tokenizer.decode(action))
+        # create five trajectories
+        for i in range(5):
+            actions = list(generate(args.forward, model))
+            print(tokenizer.batch_decode(actions))
