@@ -1,6 +1,6 @@
 # RobLM
 
-Supplemental code for the thesis: [Leveraging Large Language Models for Autonomous Task Planning](https://drive.google.com/file/d/1fsLtoKo4nMTdt_FUqjBVHWYn9-ezxoIc/view?usp=sharing).
+Supplemental code for the thesis [Leveraging Large Language Models for Autonomous Task Planning](https://drive.google.com/file/d/1fsLtoKo4nMTdt_FUqjBVHWYn9-ezxoIc/view?usp=sharing).
 
 ## Installation
 `conda env create -f env.yml` 
